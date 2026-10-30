@@ -2,11 +2,11 @@
 
 Library Bridge groups matching titles across paired libraries in search, Next Up, and Continue Watching while retaining their existing library membership, IDs, media folders, files, and STRM URLs. It supplies selectable Local / On Demand sources through Jellyfin's playback API and synchronizes watched status and resume progress.
 
-Version **0.2.1.0** targets **Jellyfin 12.4.0 on .NET 10**, includes Continue Watching deduplication, and supports catalog installation/automatic updates. It is disabled when first installed. It has local automated coverage, including Jellyfin's actual search/grouping, Next Up, and resume-query code on a disposable SQLite database. Production installation, your PostgreSQL provider, and playback in your actual clients still require validation.
+Version **0.2.2.0** targets **Jellyfin 12.4.0 on .NET 10**, fixes early-startup initialization, includes Continue Watching deduplication, and supports catalog installation/automatic updates. It is disabled when first installed. It has local automated coverage, including early persistence initialization and Jellyfin's actual search/grouping, Next Up, and resume-query code on a disposable SQLite database. Production installation, your PostgreSQL provider, and playback in your actual clients still require validation.
 
 ## Install and preview
 
-1. Follow the [repository installation steps](../README.md#install-and-update-through-jellyfin) to install **Library Bridge** from Jellyfin's Catalog. For a manual/offline build, `build.ps1` also creates `artifacts/LibraryBridge_0.2.1.0_jellyfin12.4.zip` containing the DLL and descriptor; extract those directly into `Library Bridge_0.2.1.0` inside the server's actual plugins directory.
+1. Follow the [repository installation steps](../README.md#install-and-update-through-jellyfin) to install **Library Bridge** from Jellyfin's Catalog. For a manual/offline build, `build.ps1` also creates `artifacts/LibraryBridge_0.2.2.0_jellyfin12.4.zip` containing the DLL and descriptor; extract those directly into `Library Bridge_0.2.2.0` inside the server's actual plugins directory.
 2. Restart Jellyfin when requested and open **Dashboard → Plugins → Library Bridge**.
 3. Adjust the library pairs to your exact names or IDs. Defaults are `Shows` ↔ `Shows On Demand` and `Movies` ↔ `Movies On Demand`.
 4. Choose **Preview matches**. Preview reads the catalog without changing any item or watch history. The report includes group IDs, member item IDs, counts, and conflicting identities that were skipped. No matching-name fallback is used.

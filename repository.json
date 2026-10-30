@@ -16,7 +16,7 @@
       "jellyfinVersion": "12.4.0",
       "nativeTests": true,
       "archivePrefix": "LibraryBridge",
-      "changelog": "Adds Jellyfin repository installation and automatic updates. Includes cross-library search, Next Up and Continue Watching grouping, selectable local/on-demand sources, and shared watch progress."
+      "changelog": "Fixes Jellyfin 12.4 startup failing with 'Library Bridge is not initialized'. Creates the recovery journal from early server application paths, preserves the existing journal directory, and adds early-startup persistence regression tests."
     },
     {
       "directory": "ParentalGuide",

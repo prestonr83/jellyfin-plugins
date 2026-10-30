@@ -1,4 +1,5 @@
 using Jellyfin.Plugin.LibraryBridge.Core;
+using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Persistence;
 using MediaBrowser.Controller.Plugins;
@@ -27,8 +28,11 @@ public sealed class ServiceRegistrator : IPluginServiceRegistrator
                 ?? repository.ImplementationFactory?.Invoke(sp)
                 ?? ActivatorUtilities.CreateInstance(sp, repository.ImplementationType!)),
             sp.GetRequiredService<BridgeIndex>()));
-        services.AddSingleton(_ => new RecoveryJournal(Path.Combine(
-            (Plugin.Instance ?? throw new InvalidOperationException("Library Bridge is not initialized.")).DataFolderPath, "recovery-v1.json")));
+        // Jellyfin resolves persistence while building its host, before constructing plugins.
+        // Use the same stable directory as BasePlugin<T>, without accessing Plugin.Instance.
+        services.AddSingleton(sp => new RecoveryJournal(Path.Combine(
+            sp.GetRequiredService<IApplicationPaths>().PluginsPath,
+            Path.GetFileNameWithoutExtension(typeof(Plugin).Assembly.Location), "recovery-v1.json")));
         services.AddSingleton<IItemPersistenceService>(sp => new GroupingPersistence(
             (IItemPersistenceService)(descriptor.ImplementationInstance
                 ?? descriptor.ImplementationFactory?.Invoke(sp)
