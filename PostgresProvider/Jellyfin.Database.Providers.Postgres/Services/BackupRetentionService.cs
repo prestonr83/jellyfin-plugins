@@ -90,7 +90,7 @@ public static class BackupRetentionService
         var bytes = removed.Sum(static b => b.SizeBytes);
         if (!dryRun && (removed.Count > 0 || failed.Count > 0))
         {
-            PostgresLog.Info($"[Retención] {removed.Count} respaldo(s) eliminado(s) ({MaintenanceService.FormatBytes(bytes)}) en {directory}; fallos: {failed.Count}.");
+            PostgresLog.Info($"[Retention] {removed.Count} backup(s) deleted ({MaintenanceService.FormatBytes(bytes)}) in {directory}; failures: {failed.Count}.");
         }
 
         return new BackupRetentionResult(removed.Select(static b => b.Name).ToList(), removed.Count, bytes, MaintenanceService.FormatBytes(bytes), failed, dryRun);

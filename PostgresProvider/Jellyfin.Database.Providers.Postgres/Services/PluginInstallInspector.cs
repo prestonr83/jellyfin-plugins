@@ -52,11 +52,11 @@ public static class PluginInstallInspector
 
             var detail = string.Create(
                 CultureInfo.InvariantCulture,
-                $"Hay otra copia del plugin en '{sibling.Name}' (estado: {status}{(hasAssembly ? ", contiene el ensamblado" : string.Empty)}). ");
+                $"Another copy of the plugin exists in '{sibling.Name}' (status: {status}{(hasAssembly ? ", contains the assembly" : string.Empty)}). ");
             var advice = newer
-                ? $"Es MÁS NUEVA que la que está en ejecución ({loadedVersion}): Jellyfin está cargando una versión antigua. "
-                : "Jellyfin puede cargar el ensamblado equivocado y los cambios del plugin no tendrían efecto. ";
-            warnings.Add(detail + advice + "Detén Jellyfin, elimina esa carpeta y vuelve a iniciarlo.");
+                ? $"It is NEWER than the running version ({loadedVersion}): Jellyfin is loading an older version. "
+                : "Jellyfin may load the wrong assembly, preventing plugin changes from taking effect. ";
+            warnings.Add(detail + advice + "Stop Jellyfin, delete that folder, and start it again.");
         }
 
         return warnings;
@@ -69,7 +69,7 @@ public static class PluginInstallInspector
             var meta = Path.Combine(folder, "meta.json");
             if (!File.Exists(meta))
             {
-                return "sin meta.json";
+                return "no meta.json";
             }
 
             using var document = JsonDocument.Parse(File.ReadAllText(meta));

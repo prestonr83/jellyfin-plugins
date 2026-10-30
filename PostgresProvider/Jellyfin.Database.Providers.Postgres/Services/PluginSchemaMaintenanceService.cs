@@ -111,10 +111,10 @@ ORDER BY pg_total_relation_size(c.oid) DESC, c.relname";
         command.Parameters.AddWithValue("schema", schemaName);
         if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
         {
-            throw new ArgumentException("El esquema solicitado no está registrado por PG Provider.", nameof(schemaName));
+            throw new ArgumentException("The requested schema is not registered with PG Provider.", nameof(schemaName));
         }
 
-        PostgresLog.Info($"[PluginSchemas] Política actualizada: esquema={schemaName}, analyze={policy.IncludeAnalyze}, vacuum={policy.IncludeVacuum}, reindex={policy.IncludeReindex}.");
+        PostgresLog.Info($"[PluginSchemas] Policy updated: schema={schemaName}, analyze={policy.IncludeAnalyze}, vacuum={policy.IncludeVacuum}, reindex={policy.IncludeReindex}.");
         return policy;
     }
 
@@ -126,7 +126,7 @@ ORDER BY pg_total_relation_size(c.oid) DESC, c.relname";
             "analyze" => "SELECT schema_name FROM jellyfin_provider.plugin_schemas WHERE include_analyze = true ORDER BY schema_name",
             "vacuum" => "SELECT schema_name FROM jellyfin_provider.plugin_schemas WHERE include_vacuum = true ORDER BY schema_name",
             "reindex" => "SELECT schema_name FROM jellyfin_provider.plugin_schemas WHERE include_reindex = true ORDER BY schema_name",
-            _ => throw new ArgumentException("Política de mantenimiento no reconocida.", nameof(policyColumn)),
+            _ => throw new ArgumentException("Unrecognized maintenance policy.", nameof(policyColumn)),
         };
         var schemas = new List<string>();
         using var connection = new NpgsqlConnection(connectionString);
@@ -186,7 +186,7 @@ ORDER BY pg_total_relation_size(c.oid) DESC, c.relname";
         }
 
         stopwatch.Stop();
-        PostgresLog.Info($"[PluginSchemas] {operation} completado: esquema={registeredSchema}, tablas={tableNames.Count}, duracion={stopwatch.Elapsed.TotalSeconds.ToString("F1", CultureInfo.InvariantCulture)}s.");
+        PostgresLog.Info($"[PluginSchemas] {operation} completed: schema={registeredSchema}, tables={tableNames.Count}, duration={stopwatch.Elapsed.TotalSeconds.ToString("F1", CultureInfo.InvariantCulture)}s.");
         return new PluginSchemaMaintenanceResult(operation, registeredSchema, null, tableNames.Count, stopwatch.ElapsedMilliseconds);
     }
 
@@ -213,7 +213,7 @@ ORDER BY pg_total_relation_size(c.oid) DESC, c.relname";
         }
 
         stopwatch.Stop();
-        PostgresLog.Info($"[PluginSchemas] {operation} completado: esquema={table.SchemaName}, tabla={table.TableName}, duracion={stopwatch.Elapsed.TotalSeconds.ToString("F1", CultureInfo.InvariantCulture)}s.");
+        PostgresLog.Info($"[PluginSchemas] {operation} completed: schema={table.SchemaName}, table={table.TableName}, duration={stopwatch.Elapsed.TotalSeconds.ToString("F1", CultureInfo.InvariantCulture)}s.");
         return new PluginSchemaMaintenanceResult(operation, table.SchemaName, table.TableName, 1, stopwatch.ElapsedMilliseconds);
     }
 
@@ -256,7 +256,7 @@ ORDER BY pg_total_relation_size(c.oid) DESC, c.relname";
         var registeredSchema = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string;
         if (string.IsNullOrWhiteSpace(registeredSchema))
         {
-            throw new ArgumentException("El esquema solicitado no está registrado por PG Provider.", nameof(schemaName));
+            throw new ArgumentException("The requested schema is not registered with PG Provider.", nameof(schemaName));
         }
 
         return registeredSchema;
@@ -272,7 +272,7 @@ ORDER BY pg_total_relation_size(c.oid) DESC, c.relname";
         using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            throw new ArgumentException("El esquema solicitado no está registrado por PG Provider.", nameof(schemaName));
+            throw new ArgumentException("The requested schema is not registered with PG Provider.", nameof(schemaName));
         }
 
         return new PluginSchemaMaintenancePolicy(reader.GetBoolean(0), reader.GetBoolean(1), reader.GetBoolean(2));
@@ -291,7 +291,7 @@ ORDER BY pg_total_relation_size(c.oid) DESC, c.relname";
         using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            throw new ArgumentException("La tabla solicitada no pertenece al esquema registrado.", nameof(tableName));
+            throw new ArgumentException("The requested table does not belong to the registered schema.", nameof(tableName));
         }
 
         return (reader.GetString(0), reader.GetString(1));
@@ -304,7 +304,7 @@ ORDER BY pg_total_relation_size(c.oid) DESC, c.relname";
         command.Parameters.AddWithValue("schema", schemaName);
         if (!(bool)(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!)
         {
-            throw new InvalidOperationException("Ya hay una operación de mantenimiento en curso para este esquema.");
+            throw new InvalidOperationException("A maintenance operation is already running for this schema.");
         }
     }
 
@@ -318,7 +318,7 @@ ORDER BY pg_total_relation_size(c.oid) DESC, c.relname";
         }
         catch (Exception ex)
         {
-            PostgresLog.Warn($"[PluginSchemas] No se pudo liberar el bloqueo de mantenimiento para {schemaName}: {ex.Message}");
+            PostgresLog.Warn($"[PluginSchemas] Could not release the maintenance lock for {schemaName}: {ex.Message}");
         }
     }
 

@@ -155,7 +155,7 @@ public sealed class DbErrorLoggingInterceptor : DbCommandInterceptor
             }
             else
             {
-                PostgresLog.Write(level, string.Concat(message, " | traza completa ya reportada"));
+                PostgresLog.Write(level, string.Concat(message, " | full stack trace already reported"));
             }
         }
         else
@@ -173,7 +173,7 @@ public sealed class DbErrorLoggingInterceptor : DbCommandInterceptor
 
         PostgresLog.Warn(string.Create(
             CultureInfo.InvariantCulture,
-            $"[DB] Consulta lenta ({commandKind}): {duration.TotalMilliseconds:F0} ms | SQL: {Truncate(command.CommandText, MaxSqlPreviewLength)}"));
+            $"[DB] Slow query ({commandKind}): {duration.TotalMilliseconds:F0} ms | SQL: {Truncate(command.CommandText, MaxSqlPreviewLength)}"));
     }
 
     /// <summary>
@@ -196,7 +196,7 @@ public sealed class DbErrorLoggingInterceptor : DbCommandInterceptor
 
             if (!string.IsNullOrWhiteSpace(postgres.TableName))
             {
-                text.Append(" | tabla=").Append(postgres.TableName);
+                text.Append(" | table=").Append(postgres.TableName);
             }
         }
 

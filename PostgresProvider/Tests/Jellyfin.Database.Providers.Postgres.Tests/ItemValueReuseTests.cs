@@ -44,7 +44,7 @@ public sealed class ItemValueReuseTests
             string.Concat(
                 """INSERT INTO "ItemValues" ("ItemValueId", "Type", "Value", "CleanValue") VALUES ('""",
                 stored.ToString(),
-                """', 2, 'Accion', 'accion');"""));
+                """', 2, 'Action', 'action');"""));
 
         var pending = Guid.NewGuid();
         var fresh = Guid.NewGuid();
@@ -55,8 +55,8 @@ public sealed class ItemValueReuseTests
             {
                 ItemValueId = pending,
                 Type = ItemValueType.Genre,
-                Value = "Accion",
-                CleanValue = "accion",
+                Value = "Action",
+                CleanValue = "action",
             });
             context.ItemValuesMap.Add(new ItemValueMap
             {
@@ -85,7 +85,7 @@ public sealed class ItemValueReuseTests
             await context.SaveChangesAsync();
         }
 
-        Assert.Equal(1, await ScalarAsync(connectionString, """SELECT COUNT(*) FROM "ItemValues" WHERE "Type" = 2 AND "Value" = 'Accion';"""));
+        Assert.Equal(1, await ScalarAsync(connectionString, """SELECT COUNT(*) FROM "ItemValues" WHERE "Type" = 2 AND "Value" = 'Action';"""));
         Assert.Equal(1, await ScalarAsync(connectionString, """SELECT COUNT(*) FROM "ItemValues" WHERE "Type" = 2 AND "Value" = 'Recien llegada';"""));
 
         var mapped = await ReadMappedValueIdsAsync(connectionString, itemId);
@@ -191,8 +191,8 @@ public sealed class ItemValueReuseTests
     }
 
     /// <summary>
-    /// El interceptor tiene que reescribir el cambio pendiente antes de que EF lo traduzca a SQL. Se
-    /// comprueba sobre el rastreador de cambios, sin depender de que el guardado llegue a ejecutarse.
+    /// The interceptor must rewrite the pending change before EF translates it to SQL. This is
+    /// checked on the change tracker, without depending on whether the save is executed.
     /// </summary>
     [SkippableFact]
     public async Task PendingValueIsDroppedAndItsMappingRepointedBeforeSaving()
@@ -213,7 +213,7 @@ public sealed class ItemValueReuseTests
             string.Concat(
                 """INSERT INTO "ItemValues" ("ItemValueId", "Type", "Value", "CleanValue") VALUES ('""",
                 stored.ToString(),
-                """', 2, 'Accion', 'accion');"""));
+                """', 2, 'Action', 'action');"""));
 
         var pending = Guid.NewGuid();
         using var context = CreateContext(connectionString);
@@ -222,8 +222,8 @@ public sealed class ItemValueReuseTests
         {
             ItemValueId = pending,
             Type = ItemValueType.Genre,
-            Value = "Accion",
-            CleanValue = "accion",
+            Value = "Action",
+            CleanValue = "action",
         };
         var mapping = new ItemValueMap
         {
@@ -251,7 +251,7 @@ public sealed class ItemValueReuseTests
     }
 
     /// <summary>
-    /// Un valor realmente nuevo no debe tocarse: su fila y su mapa tienen que insertarse tal cual.
+    /// A new value must remain unchanged: its row and mapping must be inserted as supplied.
     /// </summary>
     [SkippableFact]
     public async Task PendingValueThatDoesNotExistIsLeftAlone()

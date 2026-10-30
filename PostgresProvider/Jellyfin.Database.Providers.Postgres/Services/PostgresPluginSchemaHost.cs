@@ -75,7 +75,7 @@ internal sealed partial class PostgresPluginSchemaHost : IPluginSchemaHost
             var schema = new PluginSchema(request.PluginId, request.SchemaName);
             await RegisterSchemaAsync(connection, transaction, request, existed, cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-            PostgresLog.Info($"[PluginSchema] Esquema privado disponible: {request.SchemaName}.");
+            PostgresLog.Info($"[PluginSchema] Private schema available: {request.SchemaName}.");
             return schema;
         }
         catch
@@ -128,7 +128,7 @@ internal sealed partial class PostgresPluginSchemaHost : IPluginSchemaHost
                 existed: true,
                 cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-            PostgresLog.Info($"[PluginSchema] Esquema pre-registro migrado: {legacySchemaName} -> {request.SchemaName}.");
+            PostgresLog.Info($"[PluginSchema] Pre-registry schema migrated: {legacySchemaName} -> {request.SchemaName}.");
             return new PluginSchema(request.PluginId, request.SchemaName);
         }
         catch
@@ -175,12 +175,12 @@ internal sealed partial class PostgresPluginSchemaHost : IPluginSchemaHost
             }
 
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-            PostgresLog.Info($"[PluginSchema] Migraciones aplicadas para {schema.Name}: {migrations.Count} declaradas.");
+            PostgresLog.Info($"[PluginSchema] Migrations applied to {schema.Name}: {migrations.Count} declared.");
         }
         catch (Exception ex)
         {
             await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            PostgresLog.Error($"[PluginSchema] Migración fallida para {schema.Name}", ex);
+            PostgresLog.Error($"[PluginSchema] Migration failed for {schema.Name}", ex);
             throw;
         }
     }
@@ -208,7 +208,7 @@ internal sealed partial class PostgresPluginSchemaHost : IPluginSchemaHost
         catch (Exception ex)
         {
             await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            PostgresLog.Error($"[PluginSchema] Escritura fallida para {schema.Name}", ex);
+            PostgresLog.Error($"[PluginSchema] Write failed for {schema.Name}", ex);
             throw;
         }
     }
@@ -244,7 +244,7 @@ internal sealed partial class PostgresPluginSchemaHost : IPluginSchemaHost
         catch (Exception ex)
         {
             await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            PostgresLog.Error($"[PluginSchema] Consulta fallida para {schema.Name}", ex);
+            PostgresLog.Error($"[PluginSchema] Query failed for {schema.Name}", ex);
             throw;
         }
     }

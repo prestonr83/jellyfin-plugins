@@ -97,7 +97,7 @@ public sealed class MigrationCodeMigrationsTests
             await MigrationCodeMigrations.CopyAppliedAsync(sqlite, pg, new HashSet<string>(StringComparer.Ordinal), log.Add);
 
             Assert.Equal(before, (await ReadTargetHistoryAsync(pg)).Count);
-            Assert.Contains(log, entry => entry.Contains("No se encontraron tipos", StringComparison.Ordinal));
+            Assert.Contains(log, entry => entry.Contains("No Jellyfin code migration types found", StringComparison.Ordinal));
         }
         finally
         {

@@ -48,7 +48,7 @@ public sealed partial class HealthCheckService
     /// <param name="connectionString">PostgreSQL connection string.</param>
     /// <param name="schema">Schema to inspect. Defaults to <c>public</c>.</param>
     /// <param name="silent">
-    /// When <see langword="true"/>, suppresses the INICIO/COMPLETADO log lines.
+    /// When <see langword="true"/>, suppresses the START/COMPLETED log lines.
     /// Use for the automatic startup check to avoid duplicating the summary written
     /// by <c>LogHealthSummary</c> in <c>PostgresDatabaseProvider</c>.
     /// </param>
@@ -64,7 +64,7 @@ public sealed partial class HealthCheckService
 
         if (!silent)
         {
-            PostgresLog.Info($"[HealthCheck] INICIO: diagnóstico en schema '{schema}'...");
+            PostgresLog.Info($"[HealthCheck] START: diagnostics in schema '{schema}'...");
         }
 
         // Each check runs in parallel and is wrapped so a single failure
@@ -93,8 +93,8 @@ public sealed partial class HealthCheckService
         {
             LogFindings(findings);
             PostgresLog.Warn(
-                $"[HealthCheck] COMPLETADO en {sw.Elapsed.TotalSeconds:F1}s | Severidad: {overall} | " +
-                $"Hallazgos: {findings.Count} | Schema: {schema}");
+                $"[HealthCheck] COMPLETED in {sw.Elapsed.TotalSeconds:F1}s | Severity: {overall} | " +
+                $"Findings: {findings.Count} | Schema: {schema}");
         }
 
         if (_logger.IsEnabled(LogLevel.Information))
@@ -127,7 +127,7 @@ public sealed partial class HealthCheckService
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var items = new List<HealthRepairItem>();
 
-        PostgresLog.Info($"[HealthCheck] INICIO: Auto-repair en schema '{schema}'...");
+        PostgresLog.Info($"[HealthCheck] START: Auto-repair in schema '{schema}'...");
 
         // Re-detect across all schemas so we never try to REINDEX an orphan in pg_toast.
         var invalidIndexes = await FindInvalidIndexesAsync(connectionString, ct).ConfigureAwait(false);
@@ -142,8 +142,8 @@ public sealed partial class HealthCheckService
             {
                 ccnewSkipped.Add(target);
                 var hint = SuperuserSchemas.Contains(idxSchema)
-                    ? "Requiere superusuario (postgres): DROP INDEX pg_toast.\"" + index + "\";"
-                    : "Ejecuta DROP INDEX para eliminarlo manualmente.";
+                    ? "Requires a superuser (postgres): DROP INDEX pg_toast.\"" + index + "\";"
+                    : "Run DROP INDEX to delete it manually.";
                 items.Add(new HealthRepairItem("SkipCcnew", target, false, hint));
                 continue;
             }
@@ -154,7 +154,7 @@ public sealed partial class HealthCheckService
         if (ccnewSkipped.Count > 0)
         {
             PostgresLog.Warn(
-                $"[HealthCheck] SKIP {ccnewSkipped.Count} índice(s) — requieren intervención manual: " +
+                $"[HealthCheck] SKIP {ccnewSkipped.Count} index(es) — manual intervention required: " +
                 string.Join(", ", ccnewSkipped));
         }
 
@@ -174,8 +174,8 @@ public sealed partial class HealthCheckService
         sw.Stop();
 
         PostgresLog.Warn(
-            $"[HealthCheck] COMPLETADO en {sw.Elapsed.TotalSeconds:F1}s: " +
-            $"{items.Count} acciones ({items.Count(static i => i.Success)} ok, {items.Count(static i => !i.Success)} fallaron).");
+            $"[HealthCheck] COMPLETED in {sw.Elapsed.TotalSeconds:F1}s: " +
+            $"{items.Count} actions ({items.Count(static i => i.Success)} succeeded, {items.Count(static i => !i.Success)} failed).");
 
         return new HealthRepairResult(overallSuccess, items, DateTime.UtcNow, sw.ElapsedMilliseconds);
     }
@@ -216,9 +216,9 @@ public sealed partial class HealthCheckService
             findings.Add(new HealthFinding(
                 Check: "OrphanCcnewIndexesSuperuser",
                 Severity: HealthSeverity.Warn,
-                Message: $"{ccnewSuperuser.Count} índice(s) _ccnew huérfano(s) en schemas del sistema ({string.Join(", ", ccnewSuperuser.Select(static p => p.Schema).Distinct())}). "
-                       + "El usuario de la BD no tiene permisos para eliminarlos. "
-                       + "Conectáte como superusuario (postgres) y ejecuta DROP INDEX para cada uno.",
+                Message: $"{ccnewSuperuser.Count} orphaned _ccnew index(es) in system schemas ({string.Join(", ", ccnewSuperuser.Select(static p => p.Schema).Distinct())}). "
+                       + "The database user does not have permission to delete them. "
+                       + "Connect as a superuser (postgres) and run DROP INDEX for each one.",
                 Detail: names,
                 Repairable: false));
         }
@@ -229,8 +229,8 @@ public sealed partial class HealthCheckService
             findings.Add(new HealthFinding(
                 Check: "OrphanCcnewIndexes",
                 Severity: HealthSeverity.Error,
-                Message: $"{ccnewUser.Count} índice(s) _ccnew huérfano(s) de un REINDEX CONCURRENTLY interrumpido. "
-                       + "No pueden repararse automáticamente — ejecuta DROP INDEX para cada uno.",
+                Message: $"{ccnewUser.Count} orphaned _ccnew index(es) from an interrupted REINDEX CONCURRENTLY. "
+                       + "They cannot be repaired automatically — run DROP INDEX for each one.",
                 Detail: names,
                 Repairable: false));
         }
@@ -241,7 +241,7 @@ public sealed partial class HealthCheckService
             findings.Add(new HealthFinding(
                 Check: "InvalidIndexes",
                 Severity: HealthSeverity.Error,
-                Message: $"{repairable.Count} índice(s) inválido(s) encontrado(s). Los queries que los usan fallarán o serán muy lentos.",
+                Message: $"{repairable.Count} invalid index(es) found. Queries using them will fail or run very slowly.",
                 Detail: names,
                 Repairable: true));
         }
@@ -267,8 +267,8 @@ public sealed partial class HealthCheckService
             findings.Add(new HealthFinding(
                 Check: "TableBloat",
                 Severity: HealthSeverity.Warn,
-                Message: $"'{table}' tiene {deadPct.ToString("F1", CultureInfo.InvariantCulture)}% de tuplas muertas. " +
-                         "Un VACUUM ANALYZE recuperará espacio y refrescará el planner.",
+                Message: $"'{table}' has {deadPct.ToString("F1", CultureInfo.InvariantCulture)}% dead tuples. " +
+                         "VACUUM ANALYZE will reclaim space and refresh query planner statistics.",
                 Detail: $"{table} ({deadPct.ToString("F1", CultureInfo.InvariantCulture)}%)",
                 Repairable: true));
         }
@@ -294,8 +294,8 @@ public sealed partial class HealthCheckService
             findings.Add(new HealthFinding(
                 Check: "SequenceDesync",
                 Severity: HealthSeverity.Error,
-                Message: $"Secuencia '{seq.Sequence}' está detrás del máximo de {seq.Table}.{seq.Column} " +
-                         $"(last_value={seq.LastValue:N0}, max={seq.MaxValue:N0}). El próximo INSERT puede fallar con PK duplicado.",
+                Message: $"Sequence '{seq.Sequence}' is behind the maximum value of {seq.Table}.{seq.Column} " +
+                         $"(last_value={seq.LastValue:N0}, max={seq.MaxValue:N0}). The next INSERT may fail with a duplicate primary key.",
                 Detail: $"{seq.Sequence}",
                 Repairable: true));
         }
@@ -332,8 +332,8 @@ public sealed partial class HealthCheckService
             findings.Add(new HealthFinding(
                 Check: "StaleAnalyze",
                 Severity: HealthSeverity.Warn,
-                Message: $"'{table}' ({live:N0} filas) no tiene estadísticas ANALYZE recientes. " +
-                         "El planner puede elegir planes subóptimos.",
+                Message: $"'{table}' ({live:N0} rows) has no recent ANALYZE statistics. " +
+                         "The query planner may choose suboptimal plans.",
                 Detail: table,
                 Repairable: false));
         }
@@ -428,12 +428,12 @@ public sealed partial class HealthCheckService
             var bufferHit = q.SharedHitPercent is double hit
                 ? $"buffer hit={hit:F1}%"
                 : "buffer hit=n/a";
-            var detail = $"media={q.MeanMs:F0} ms | llamadas={q.Calls:N0} | total={q.TotalMs / 1000.0:F1} s | filas̅={q.Rows:F0} | " +
-                $"{bufferHit} | bloques leídos={q.SharedBlocksRead:N0} | temp={q.TempBlocks:N0} | WAL={q.Wal}";
+            var detail = $"mean={q.MeanMs:F0} ms | calls={q.Calls:N0} | total={q.TotalMs / 1000.0:F1} s | rows={q.Rows:F0} | " +
+                $"{bufferHit} | blocks read={q.SharedBlocksRead:N0} | temp={q.TempBlocks:N0} | WAL={q.Wal}";
             findings.Add(new HealthFinding(
                 Check: "SlowQuery",
                 Severity: severity,
-                Message: $"Query lenta detectada (media {q.MeanMs:F0} ms en {q.Calls:N0} llamada(s)): {q.QueryPreview}",
+                Message: $"Slow query detected (mean {q.MeanMs:F0} ms over {q.Calls:N0} call(s)): {q.QueryPreview}",
                 Detail: detail,
                 Repairable: false));
         }
@@ -468,8 +468,8 @@ public sealed partial class HealthCheckService
             findings.Add(new HealthFinding(
                 Check: "UnusedIndex",
                 Severity: HealthSeverity.Ok,
-                Message: $"El índice '{index}' de '{table}' nunca ha sido usado por el planner. " +
-                         "Podría eliminarse para reducir el costo de escritura.",
+                Message: $"Index '{index}' on '{table}' has never been used by the query planner. " +
+                         "Consider removing it to reduce write overhead.",
                 Detail: $"{table}.{index}",
                 Repairable: false));
         }
@@ -619,7 +619,7 @@ public sealed partial class HealthCheckService
         {
             // Fail-closed: identifiers returned by the catalog are validated before use.
             var safeSchema = RequireSqlIdentifier(schema, "schema");
-            var safeTable = RequireSqlIdentifier(table, "tabla");
+            var safeTable = RequireSqlIdentifier(table, "table");
             var safeColumn = RequireSqlIdentifier(column, "columna");
             var safeSequence = RequireSqlIdentifier(sequence, "secuencia");
 
@@ -659,7 +659,7 @@ public sealed partial class HealthCheckService
         {
             // Fail-closed: validate before interpolating into DDL.
             var safeSchema = RequireSqlIdentifier(schema, "schema");
-            var safeIndex = RequireSqlIdentifier(index, "índice");
+            var safeIndex = RequireSqlIdentifier(index, "index");
 
             using var pg = new NpgsqlConnection(connectionString);
             await pg.OpenAsync(ct).ConfigureAwait(false);
@@ -672,12 +672,12 @@ public sealed partial class HealthCheckService
             }
 
             PostgresLog.Info($"[HealthCheck] REINDEX OK: {target}");
-            return new HealthRepairItem("Reindex", target, true, "Índice reconstruido correctamente.");
+            return new HealthRepairItem("Reindex", target, true, "Index rebuilt successfully.");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to reindex {Target}", target);
-            PostgresLog.Error($"[HealthCheck] REINDEX falló: {target} — {ex.Message}");
+            PostgresLog.Error($"[HealthCheck] REINDEX failed: {target} — {ex.Message}");
             return new HealthRepairItem("Reindex", target, false, ex.Message);
         }
     }
@@ -691,7 +691,7 @@ public sealed partial class HealthCheckService
         {
             // Fail-closed: validate before interpolating into DDL.
             var safeSchema = RequireSqlIdentifier(schema, "schema");
-            var safeTable = RequireSqlIdentifier(table, "tabla");
+            var safeTable = RequireSqlIdentifier(table, "table");
 
             using var pg = new NpgsqlConnection(connectionString);
             await pg.OpenAsync(ct).ConfigureAwait(false);
@@ -708,12 +708,12 @@ public sealed partial class HealthCheckService
                 "Vacuum",
                 target,
                 true,
-                $"VACUUM ANALYZE completado (bloat {deadPct.ToString("F1", CultureInfo.InvariantCulture)}%).");
+                $"VACUUM ANALYZE completed (bloat {deadPct.ToString("F1", CultureInfo.InvariantCulture)}%).");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to vacuum {Target}", target);
-            PostgresLog.Error($"[HealthCheck] VACUUM falló: {target} — {ex.Message}");
+            PostgresLog.Error($"[HealthCheck] VACUUM failed: {target} — {ex.Message}");
             return new HealthRepairItem("Vacuum", target, false, ex.Message);
         }
     }
@@ -753,7 +753,7 @@ public sealed partial class HealthCheckService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to fix sequence {Target}", target);
-            PostgresLog.Error($"[HealthCheck] FIX SEQ falló: {target} — {ex.Message}");
+            PostgresLog.Error($"[HealthCheck] FIX SEQ failed: {target} — {ex.Message}");
             return new HealthRepairItem("FixSequence", target, false, ex.Message);
         }
     }
@@ -790,13 +790,13 @@ public sealed partial class HealthCheckService
         }
         catch (Exception ex)
         {
-            PostgresLog.Error($"[HealthCheck] '{checkName}' falló: {ex.Message}");
+            PostgresLog.Error($"[HealthCheck] '{checkName}' failed: {ex.Message}");
             return new[]
             {
                 new HealthFinding(
                     Check: checkName,
                     Severity: HealthSeverity.Error,
-                    Message: $"No se pudo ejecutar el check '{checkName}': {ex.Message}",
+                    Message: $"Could not run check '{checkName}': {ex.Message}",
                     Detail: ex.GetType().Name,
                     Repairable: false),
             };
@@ -837,7 +837,7 @@ public sealed partial class HealthCheckService
     /// throws and aborts the operation instead of being embedded into SQL.
     /// </summary>
     /// <param name="name">Identifier returned by PostgreSQL catalog views.</param>
-    /// <param name="kind">Human-readable kind used in the error message (e.g. "tabla").</param>
+    /// <param name="kind">Human-readable kind used in the error message (e.g. "table").</param>
     /// <returns>The validated identifier.</returns>
     /// <exception cref="InvalidOperationException">When <paramref name="name"/> is not a safe SQL identifier.</exception>
     private static string RequireSqlIdentifier(string name, string kind)
@@ -845,7 +845,7 @@ public sealed partial class HealthCheckService
         if (string.IsNullOrWhiteSpace(name) || !SqlIdentifierRegex().IsMatch(name))
         {
             throw new InvalidOperationException(
-                $"El servidor devolvió un {kind} no esperado ('{name}'); se cancela la operación por seguridad.");
+                $"The server returned an unexpected {kind} ('{name}'); the operation was cancelled for safety.");
         }
 
         return name;

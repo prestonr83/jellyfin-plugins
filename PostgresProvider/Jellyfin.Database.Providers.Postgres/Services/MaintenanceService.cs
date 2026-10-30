@@ -72,7 +72,7 @@ public sealed class MaintenanceService
     public async Task VacuumAnalyzeAsync(string connectionString, CancellationToken ct = default)
     {
         _logger.LogInformation("Starting VACUUM ANALYZE...");
-        PostgresLog.Info("[Vacuum] INICIO: VACUUM ANALYZE en toda la base de datos...");
+        PostgresLog.Info("[Vacuum] START: VACUUM ANALYZE on the entire database...");
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
         using var pg = new NpgsqlConnection(connectionString);
@@ -82,7 +82,7 @@ public sealed class MaintenanceService
 
         sw.Stop();
         _logger.LogInformation("VACUUM ANALYZE completed.");
-        PostgresLog.Info($"[Vacuum] COMPLETADO en {sw.Elapsed.TotalSeconds:F1}s. Las tablas han sido analizadas y el espacio muerto recuperado.");
+        PostgresLog.Info($"[Vacuum] COMPLETED in {sw.Elapsed.TotalSeconds:F1}s. Tables analyzed and dead tuple space reclaimed.");
     }
 
     /// <summary>Runs VACUUM (ANALYZE) one table at a time for a validated provider-owned schema.</summary>
@@ -123,7 +123,7 @@ public sealed class MaintenanceService
 
         // dbName comes from SELECT current_database() — server-controlled, not user input.
         // QuoteIdentifier escapes any internal double-quotes for safety.
-        PostgresLog.Info($"[Reindex] INICIO: REINDEX DATABASE CONCURRENTLY {dbName}...");
+        PostgresLog.Info($"[Reindex] START: REINDEX DATABASE CONCURRENTLY {dbName}...");
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
         using var cmd = CreateReindexCommand(pg, dbName);
@@ -131,7 +131,7 @@ public sealed class MaintenanceService
 
         sw.Stop();
         _logger.LogInformation("REINDEX DATABASE completed.");
-        PostgresLog.Info($"[Reindex] COMPLETADO en {sw.Elapsed.TotalSeconds:F1}s. Todos los índices de '{dbName}' han sido reconstruidos.");
+        PostgresLog.Info($"[Reindex] COMPLETED in {sw.Elapsed.TotalSeconds:F1}s. All indexes in '{dbName}' rebuilt.");
     }
 
     /// <summary>Rebuilds all indexes in a provider-owned schema concurrently.</summary>

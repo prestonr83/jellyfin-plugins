@@ -39,9 +39,9 @@ public sealed partial class UpsertConflictInterceptor : DbCommandInterceptor
     // during a library refresh or plugin-triggered collection update.
     //
     // BaseItems is here for the same reason and it is what breaks channel items and image conversions:
-    // Jellyfin cree que el item es nuevo (no esta en su cache) cuando la fila ya existe, y el INSERT
-    // duplicado hacia fallar todo el lote con 23505. Ignorarlo deja la fila que ya estaba, y las claves
-    // foraneas de las tablas hijas siguen apuntando a ella.
+    // Jellyfin considers the item new (absent from its cache) when the row already exists, and a
+    // duplicate INSERT used to fail the entire batch with 23505. Ignoring it preserves the existing
+    // row, so foreign keys in child tables continue to reference it.
     //
     // ItemValues is rewritten too. Ignoring a duplicate value row on its own would leave ItemValuesMap
     // pointing at a value that was never inserted, so the mapping insert is made conditional in the same

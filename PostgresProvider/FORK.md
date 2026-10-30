@@ -5,8 +5,10 @@ This is the publishable copy of the existing modified provider, imported from th
 - Upstream: [BORNIOS/Jellyfin-Database-Providers-Postgres](https://github.com/BORNIOS/Jellyfin-Database-Providers-Postgres)
 - Imported upstream HEAD: `66d985302f5abb03c271e9d19f56080c572b934e`
 - Prior local provider: `3.2.0.5`
-- Catalog provider: `3.2.0.6`, Jellyfin `12.4.0.0`, .NET 10
+- Catalog provider: `3.2.0.7`, Jellyfin `12.4.0.0`, .NET 10
 - License: [GPL-3.0](LICENSE); upstream copyrights and attribution are preserved.
+
+Version `3.2.0.7` makes the dashboard, confirmation dialogs, server messages, health findings, migration output, and documentation English. The dashboard uses one English message dictionary, including its initial HTML and accessibility labels. Plugin identity, configuration fields, API routes, database identifiers, and migrations retain their existing names and behavior.
 
 The separate original checkout at `../Jellyfin-Database-Providers-Postgres/` has not been moved, reset, or had its Git history removed. It is ignored by the parent catalog repository. This imported directory is ordinary tracked source, so a fresh clone includes all the modifications without depending on an unpublished submodule commit. IDE settings and old upstream Actions/catalog files were omitted; the parent repository owns publishing.
 

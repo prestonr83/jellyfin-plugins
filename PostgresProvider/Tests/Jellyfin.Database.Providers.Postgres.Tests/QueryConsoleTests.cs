@@ -13,13 +13,13 @@ public sealed class QueryConsoleTests
     [Theory]
     [InlineData("SELECT 1")]
     [InlineData("select \"Id\" from \"BaseItems\" limit 5;")]
-    [InlineData("SELECT COUNT(*) FROM \"UserData\" -- comentario final")]
-    [InlineData("/* plan primero */ EXPLAIN SELECT 1")]
-    [InlineData("WITH valores AS (SELECT 1 AS n) SELECT n FROM valores")]
+    [InlineData("SELECT COUNT(*) FROM \"UserData\" -- trailing comment")]
+    [InlineData("/* plan first */ EXPLAIN SELECT 1")]
+    [InlineData("WITH numbers AS (SELECT 1 AS n) SELECT n FROM numbers")]
     [InlineData("SHOW search_path")]
     [InlineData("TABLE \"BaseItems\"")]
     [InlineData("VALUES (1), (2)")]
-    [InlineData("SELECT 'UPDATE' AS palabra, \"SET\" FROM (VALUES (1)) AS t(\"SET\")")]
+    [InlineData("SELECT 'UPDATE' AS word, \"SET\" FROM (VALUES (1)) AS t(\"SET\")")]
     public void ReadOnlyStatementsAreAccepted(string sql)
     {
         var validated = QueryConsoleService.Validate(sql);
@@ -40,9 +40,9 @@ public sealed class QueryConsoleTests
     [InlineData("SET search_path = public")]
     [InlineData("VACUUM")]
     [InlineData("SELECT 1; DROP TABLE \"BaseItems\"")]
-    [InlineData("SELECT * INTO copia FROM \"BaseItems\"")]
-    [InlineData("-- despista\nUPDATE \"BaseItems\" SET \"Name\" = 'x'")]
-    [InlineData("/* despista */ DELETE FROM \"UserData\"")]
+    [InlineData("SELECT * INTO item_copy FROM \"BaseItems\"")]
+    [InlineData("-- misleading comment\nUPDATE \"BaseItems\" SET \"Name\" = 'x'")]
+    [InlineData("/* misleading comment */ DELETE FROM \"UserData\"")]
     [InlineData("SELECT $$'$$; DROP TABLE \"BaseItems\"; SELECT $$'$$")]
     [InlineData("SELECT $tag$x$tag$")]
     public void MutatingOrMultiStatementSqlIsRejected(string sql)
@@ -58,7 +58,7 @@ public sealed class QueryConsoleTests
     [Fact]
     public void KeywordsHiddenInLiteralsAreNotRejected()
     {
-        const string sql = "SELECT 'DELETE FROM \"UserData\"' AS ejemplo";
+        const string sql = "SELECT 'DELETE FROM \"UserData\"' AS example";
 
         Assert.Equal(sql, QueryConsoleService.Validate(sql));
     }
@@ -72,12 +72,12 @@ public sealed class QueryConsoleTests
     {
         var presets = PanelTemplates();
 
-        Assert.True(presets.Count >= 8, $"Se esperaban al menos 8 plantillas en el panel, encontradas {presets.Count}.");
+        Assert.True(presets.Count >= 8, $"Expected at least 8 dashboard presets; found {presets.Count}.");
         foreach (var preset in presets.Where(p => !string.IsNullOrWhiteSpace(p.Sql)))
         {
             Assert.False(
                 string.IsNullOrWhiteSpace(QueryConsoleService.Validate(preset.Sql)),
-                $"La plantilla '{preset.Key}' quedó vacía al validarse.");
+                $"Template '{preset.Key}' was empty after validation.");
         }
     }
 

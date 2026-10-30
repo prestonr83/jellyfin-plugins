@@ -15,7 +15,7 @@ namespace Jellyfin.Database.Providers.Postgres.Services;
 /// Jellyfin builds some LINQ queries as <c>min(uuid)</c>/<c>max(uuid)</c> (for example
 /// <c>GetLatestChannelItems</c> on the home page, which groups by <c>PresentationUniqueKey</c>).
 /// SQLite lets <c>min</c>/<c>max</c> work on any type, PostgreSQL does not define those aggregates
-/// for <c>uuid</c>, so the query fails with <c>42883: no existe la función min(uuid)</c>.
+/// for <c>uuid</c>, so the query fails with <c>42883: function min(uuid) does not exist</c>.
 /// </para>
 /// <para>
 /// Creating the aggregates is the provider-side adaptation: it fixes every query that uses them,
@@ -127,7 +127,7 @@ internal static class SqliteCompatibilityBootstrap
         {
             // This runs during provider initialisation: a failure here must never stop Jellyfin
             // from starting, it only means the compatibility aggregates are missing.
-            PostgresLog.Error("[Compatibility] No se pudo conectar para crear los agregados min/max(uuid)", ex);
+            PostgresLog.Error("[Compatibility] Could not connect to create the min/max(uuid) aggregates", ex);
         }
     }
 
@@ -162,7 +162,7 @@ internal static class SqliteCompatibilityBootstrap
         }
         catch (Exception ex)
         {
-            PostgresLog.Error("[Compatibility] No se pudieron crear los agregados min/max(uuid)", ex);
+            PostgresLog.Error("[Compatibility] Could not create the min/max(uuid) aggregates", ex);
             return false;
         }
     }

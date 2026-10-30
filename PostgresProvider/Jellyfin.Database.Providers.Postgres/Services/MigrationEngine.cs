@@ -37,7 +37,7 @@ internal static class MigrationEngine
             throw new FileNotFoundException($"SQLite file not found: {options.SqlitePath}", options.SqlitePath);
         }
 
-        svc.Log($"Iniciando migracion: {options.SqlitePath} -> PostgreSQL (schema={options.Schema}, batch={options.BatchSize})");
+        svc.Log($"Starting migration: {options.SqlitePath} -> PostgreSQL (schema={options.Schema}, batch={options.BatchSize})");
 
         using var sqlite = new SqliteConnection($"Data Source={options.SqlitePath};Mode=ReadOnly;Cache=Shared");
         var pgConnection = new NpgsqlConnectionStringBuilder(options.PostgresConnectionString)
@@ -82,7 +82,7 @@ internal static class MigrationEngine
 
         if (errors.Count > 0)
         {
-            throw new InvalidOperationException($"{errors.Count} tabla(s) fallaron: " + string.Join(", ", errors.Select(e => e.Table)));
+            throw new InvalidOperationException($"{errors.Count} table(s) failed: " + string.Join(", ", errors.Select(e => e.Table)));
         }
 
         // The source history records every routine that already ran against this server, on the very data
@@ -90,8 +90,8 @@ internal static class MigrationEngine
         // legacy ones expect library.db, which a fresh 12.x install no longer has.
         await MigrationCodeMigrations.CopyAppliedAsync(sqlite, pg, svc.Log).ConfigureAwait(false);
 
-        svc.Log($"Migracion completada. Total de filas copiadas: {totalRows}.");
-        PostgresLog.Info($"[Migration] Total filas migradas: {totalRows:N0}");
+        svc.Log($"Migration completed. Total rows copied: {totalRows}.");
+        PostgresLog.Info($"[Migration] Total rows migrated: {totalRows:N0}");
     }
 
     // Private helpers
@@ -105,8 +105,8 @@ internal static class MigrationEngine
         var tables = await MigrationDiscovery.GetSqliteTablesAsync(sqlite).ConfigureAwait(false);
         var tablesToMigrate = tables.Where(t => !SkipTables.Contains(t)).ToList();
 
-        svc.Log($"Tablas SQLite: {tables.Count} total, {tablesToMigrate.Count} a migrar");
-        PostgresLog.Info($"[Migration] Tablas SQLite: {tables.Count} total, {tablesToMigrate.Count} a migrar");
+        svc.Log($"SQLite tables: {tables.Count} total, {tablesToMigrate.Count} to migrate");
+        PostgresLog.Info($"[Migration] SQLite tables: {tables.Count} total, {tablesToMigrate.Count} to migrate");
 
         return await MigrationDiscovery
             .SortTablesByFkDependencyAsync(pg, schema, tablesToMigrate)
@@ -132,7 +132,7 @@ internal static class MigrationEngine
 
         if (needFix)
         {
-            svc.Log("[Users] Permitiendo NULL en NormalizedUsername temporalmente...");
+            svc.Log("[Users] Temporarily allowing NULL in NormalizedUsername...");
             using var alterCmd = CreateAlterNormalizedUsernameDropNotNullCommand(pg, schema);
             await alterCmd.ExecuteNonQueryAsync(CancellationToken.None).ConfigureAwait(false);
         }
@@ -189,14 +189,14 @@ internal static class MigrationEngine
 
                 totalRows += rowCount;
                 svc.AddMigratedRows(rowCount);
-                svc.Log($"[{table}] OK - {rowCount} filas.");
-                PostgresLog.Info($"[Migration]   -> {table} ({rowCount:N0} filas)");
+                svc.Log($"[{table}] OK - {rowCount} rows.");
+                PostgresLog.Info($"[Migration]   -> {table} ({rowCount:N0} rows)");
             }
             catch (Exception ex)
             {
                 svc.Log($"[{table}] ERROR: {ex.Message}");
                 errors.Add((table, ex.Message));
-                PostgresLog.Error($"[Migration] ERROR en tabla {table}: {ex.Message}", ex);
+                PostgresLog.Error($"[Migration] ERROR in table {table}: {ex.Message}", ex);
             }
         }
 
@@ -213,14 +213,14 @@ internal static class MigrationEngine
         var sqliteCols = await MigrationDiscovery.GetSqliteColumnNamesAsync(sqlite, table).ConfigureAwait(false);
         if (sqliteCols.Count == 0)
         {
-            svc.Log($"[{table}] sin columnas en SQLite, omitido.");
+            svc.Log($"[{table}] no columns in SQLite; skipped.");
             return null;
         }
 
         var pgCols = await MigrationDiscovery.GetPgColumnsAsync(pg, schema, table).ConfigureAwait(false);
         if (pgCols.Count == 0)
         {
-            svc.Log($"[{table}] no existe en PostgreSQL, omitido.");
+            svc.Log($"[{table}] does not exist in PostgreSQL; skipped.");
             return null;
         }
 
@@ -231,7 +231,7 @@ internal static class MigrationEngine
 
         if (commonCols.Count == 0)
         {
-            svc.Log($"[{table}] ninguna columna coincide, omitido.");
+            svc.Log($"[{table}] no matching columns; skipped.");
             return null;
         }
 
@@ -249,7 +249,7 @@ internal static class MigrationEngine
             svc.Log("[Users] Calculando NormalizedUsername = UPPER(Username)...");
             using var fixCmd = CreateFillNormalizedUsernameCommand(pg, schema);
             var updated = await fixCmd.ExecuteNonQueryAsync(CancellationToken.None).ConfigureAwait(false);
-            svc.Log($"[Users] {updated} filas actualizadas.");
+            svc.Log($"[Users] {updated} rows updated.");
 
             using var restoreCmd = CreateAlterNormalizedUsernameSetNotNullCommand(pg, schema);
             await restoreCmd.ExecuteNonQueryAsync(CancellationToken.None).ConfigureAwait(false);

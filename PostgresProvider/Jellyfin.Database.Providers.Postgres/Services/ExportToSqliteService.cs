@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -123,7 +123,7 @@ public sealed class ExportToSqliteService : IDisposable
             _logBuffer.Clear();
         }
 
-        PostgresLog.Info($"[Export] INICIO: PostgreSQL → {sqliteDbPath}");
+        PostgresLog.Info($"[Export] START: PostgreSQL → {sqliteDbPath}");
 
         _ = Task.Run(async () =>
         {
@@ -131,7 +131,7 @@ public sealed class ExportToSqliteService : IDisposable
             {
                 await RunExportAsync(pgConnStr, sqliteDbPath, CancellationToken.None).ConfigureAwait(false);
                 _isCompleted = true;
-                PostgresLog.Info($"[Export] COMPLETADA: {_exportedRows:N0} filas exportadas → {sqliteDbPath}");
+                PostgresLog.Info($"[Export] COMPLETED: {_exportedRows:N0} rows exported → {sqliteDbPath}");
             }
             catch (Exception ex)
             {
@@ -155,7 +155,7 @@ public sealed class ExportToSqliteService : IDisposable
 
     private async Task RunExportAsync(string pgConnStr, string sqliteDbPath, CancellationToken ct)
     {
-        Log($"Iniciando exportación PostgreSQL → SQLite");
+        Log($"Starting PostgreSQL → SQLite export");
         Log($"Destino: {sqliteDbPath}");
 
         var dir = Path.GetDirectoryName(sqliteDbPath);
@@ -176,12 +176,12 @@ public sealed class ExportToSqliteService : IDisposable
 
         var tables = await ExportHelpers.GetUserTablesAsync(pgConn, ct).ConfigureAwait(false);
         tables = tables.Where(t => !SkipTables.Contains(t)).ToList();
-        Log($"Tablas a exportar: {tables.Count}");
-        PostgresLog.Info($"[Export] Tablas a exportar: {tables.Count}");
+        Log($"Tables to export: {tables.Count}");
+        PostgresLog.Info($"[Export] Tables to export: {tables.Count}");
 
         _totalRows = await ExportHelpers.EstimateTotalRowsAsync(pgConn, tables, ct).ConfigureAwait(false);
-        Log($"Filas estimadas: {_totalRows:N0}");
-        PostgresLog.Info($"[Export] Filas estimadas: {_totalRows:N0}");
+        Log($"Estimated rows: {_totalRows:N0}");
+        PostgresLog.Info($"[Export] Estimated rows: {_totalRows:N0}");
         _percentComplete = 2;
 
         // File existence and schema are guaranteed by the controller before StartExport is called.
@@ -215,11 +215,11 @@ public sealed class ExportToSqliteService : IDisposable
         // Code migrations are executable Jellyfin routines, not schema metadata. Recording an id without
         // executing its routine makes the destination look upgraded while required objects are absent.
         // Let the destination server own and run its pending code migrations.
-        Log("[PostExport] Las migraciones de código no se pre-marcan; Jellyfin las validará al iniciar.");
+        Log("[PostExport] Code migrations are not marked in advance; Jellyfin will validate them at startup.");
 
         _percentComplete = 100;
         var fileSize = new FileInfo(sqliteDbPath).Length;
-        Log($"Exportación completada. {_exportedRows:N0} filas escritas.");
+        Log($"Export completed. {_exportedRows:N0} rows written.");
         Log($"Archivo: {sqliteDbPath} ({FormatBytes(fileSize)})");
     }
 
@@ -241,7 +241,7 @@ public sealed class ExportToSqliteService : IDisposable
         if (sqliteColumns.Count == 0)
         {
             // Table does not exist in SQLite — skip it to preserve referential integrity.
-            Log($"  [SKIP] {table}: no existe en SQLite destino, omitida.");
+            Log($"  [SKIP] {table}: does not exist in the target SQLite database; skipped.");
             return;
         }
         else
@@ -270,8 +270,8 @@ public sealed class ExportToSqliteService : IDisposable
             return;
         }
 
-        Log($"  → {table} ({rowCount:N0} filas)");
-        PostgresLog.Info($"[Export]   → {table} ({rowCount:N0} filas)");
+        Log($"  → {table} ({rowCount:N0} rows)");
+        PostgresLog.Info($"[Export]   → {table} ({rowCount:N0} rows)");
 
         await ExportHelpers.ExecSqliteAsync(sqliteConn, $"""DELETE FROM "{table}";""", ct).ConfigureAwait(false);
 
@@ -518,19 +518,19 @@ public sealed class ExportToSqliteService : IDisposable
                 if (deleted > 0)
                 {
                     totalDeleted += deleted;
-                    Log($"  [Cleanup] {deleted} filas huérfanas eliminadas: {sql[..Math.Min(60, sql.Length)]}...");
+                    Log($"  [Cleanup] {deleted} orphaned rows deleted: {sql[..Math.Min(60, sql.Length)]}...");
                 }
             }
             catch (Exception ex)
             {
                 // Table may not exist in this schema version — skip silently
-                Log($"  [Cleanup] Omitido (tabla no existe): {ex.Message[..Math.Min(80, ex.Message.Length)]}");
+                Log($"  [Cleanup] Skipped (table does not exist): {ex.Message[..Math.Min(80, ex.Message.Length)]}");
             }
         }
 
         if (totalDeleted > 0)
         {
-            Log($"[PostExport] Limpieza FK: {totalDeleted} filas huérfanas eliminadas.");
+            Log($"[PostExport] Foreign key cleanup: {totalDeleted} orphaned rows deleted.");
             PostgresLog.Info($"[Export] FK cleanup: {totalDeleted} orphaned rows removed.");
         }
     }
@@ -556,7 +556,7 @@ public sealed class ExportToSqliteService : IDisposable
             // Preserve an existing bad file for forensic recovery instead of silently overwriting it.
             throw new InvalidOperationException(
                 $"library.db existente no supera PRAGMA integrity_check: {libraryDbPath}. "
-                + "Conservado sin cambios; restaúralo o elimínalo explícitamente antes de repetir la exportación.");
+                + "Kept unchanged; explicitly restore or delete it before repeating the export.");
         }
 
         using (var connection = new SqliteConnection($"Data Source={libraryDbPath}"))
@@ -569,10 +569,10 @@ public sealed class ExportToSqliteService : IDisposable
 
         if (!IsSqliteDatabaseValid(libraryDbPath))
         {
-            throw new InvalidOperationException($"No se pudo crear un library.db SQLite válido en {libraryDbPath}.");
+            throw new InvalidOperationException($"Could not create a valid SQLite library.db at {libraryDbPath}.");
         }
 
-        PostgresLog.Info($"[Export] library.db SQLite válido creado: {libraryDbPath}");
+        PostgresLog.Info($"[Export] Valid SQLite library.db created: {libraryDbPath}");
     }
 
     private static bool IsSqliteDatabaseValid(string path)

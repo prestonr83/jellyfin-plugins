@@ -172,7 +172,7 @@ public sealed class PluginSchemaExplorerService
         var registered = (bool)(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!;
         if (!registered)
         {
-            throw new ArgumentException("El esquema solicitado no está registrado por PG Provider.", nameof(schemaName));
+            throw new ArgumentException("The requested schema is not registered with PG Provider.", nameof(schemaName));
         }
     }
 
@@ -189,7 +189,7 @@ public sealed class PluginSchemaExplorerService
         using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            throw new ArgumentException("La tabla solicitada no pertenece al esquema registrado.", nameof(tableName));
+            throw new ArgumentException("The requested table does not belong to the registered schema.", nameof(tableName));
         }
 
         return (reader.GetString(0), reader.GetString(1));

@@ -38,7 +38,7 @@
       "jellyfinVersion": "12.4.0",
       "nativeTests": false,
       "archivePrefix": "PostgresProvider",
-      "changelog": "Catalog distribution of the modified Jellyfin 12.4 provider. Retains grouped-ID materialization, split item queries, rating-filter fixes, migration compatibility and existing database state. Adds automatic catalog updates and explicit Npgsql dependency packaging."
+      "changelog": "Translates the PostgreSQL dashboard, confirmation dialogs, errors, logs, health reports, migration output and documentation into English. Retains Jellyfin 12.4 compatibility, query-performance fixes, existing configuration and database state."
     }
   ]
 }

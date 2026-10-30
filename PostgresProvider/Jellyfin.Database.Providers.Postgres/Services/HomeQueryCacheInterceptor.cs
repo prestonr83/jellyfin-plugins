@@ -510,7 +510,7 @@ public sealed class HomeQueryCacheInterceptor : DbCommandInterceptor
         {
             // Never break Jellyfin — if caching fails, let EF Core execute normally.
             // Return the original result so the pipeline continues without interception.
-            PostgresLog.Warn("[Cache] Ejecución async falló; se usará PostgreSQL directo.", ex);
+            PostgresLog.Warn("[Cache] Async execution failed; querying PostgreSQL directly.", ex);
             return default; // default(InterceptionResult<DbDataReader>) = no suppression
         }
     }
@@ -571,7 +571,7 @@ public sealed class HomeQueryCacheInterceptor : DbCommandInterceptor
         catch (Exception ex)
         {
             // Never break Jellyfin — if buffering fails, let EF Core execute normally.
-            PostgresLog.Warn("[Cache] Ejecución sync falló; se usará PostgreSQL directo.", ex);
+            PostgresLog.Warn("[Cache] Sync execution failed; querying PostgreSQL directly.", ex);
             return default;
         }
     }
@@ -687,7 +687,7 @@ public sealed class HomeQueryCacheInterceptor : DbCommandInterceptor
         }
         catch (Exception ex)
         {
-            PostgresLog.Warn("[Cache] La precarga de la siguiente página falló; la siguiente solicitud consultará PostgreSQL.", ex);
+            PostgresLog.Warn("[Cache] Next-page prefetch failed; the next request will query PostgreSQL.", ex);
         }
         finally
         {
@@ -889,7 +889,7 @@ public sealed class HomeQueryCacheInterceptor : DbCommandInterceptor
         }
         catch (Exception ex)
         {
-            PostgresLog.Warn("[Cache] La optimización ORDER BY RANDOM() falló; se usará la consulta original.", ex);
+            PostgresLog.Warn("[Cache] ORDER BY RANDOM() optimization failed; using the original query.", ex);
             return default;
         }
     }

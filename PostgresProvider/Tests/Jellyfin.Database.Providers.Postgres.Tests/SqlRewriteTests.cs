@@ -98,8 +98,8 @@ public sealed class SqlRewriteTests
     }
 
     /// <summary>
-    /// Un INSERT duplicado en <c>BaseItems</c> hacia fallar todo el lote con 23505 (items de canal e
-    /// imagenes a medio crear). Ignorarlo es lo que hace SQLite y deja la fila que ya existia.
+    /// A duplicate INSERT into <c>BaseItems</c> used to fail the entire batch with 23505 (channel items and
+    /// partially created images). Ignoring it matches SQLite behavior and preserves the existing row.
     /// </summary>
     [Fact]
     public void DuplicateBaseItemInsertKeepsTheStoredRowAndReportsOneRow()
@@ -163,9 +163,9 @@ public sealed class SqlRewriteTests
     }
 
     /// <summary>
-    /// Un valor duplicado tiene que nombrar el par (Type, Value) como objetivo del conflicto: ItemValueId es
-    /// un guid nuevo en cada intento, asi que un ON CONFLICT sin objetivo nunca dispararia y el INSERT
-    /// seguiria fallando con 23505.
+    /// A duplicate value must use the (Type, Value) pair as the conflict target: ItemValueId is
+    /// a new GUID on every attempt, so an ON CONFLICT without a target would never trigger and the INSERT
+    /// would keep failing with 23505.
     /// </summary>
     [Fact]
     public void DuplicateItemValueInsertNamesTheUniquePairAsConflictTarget()
@@ -176,9 +176,9 @@ public sealed class SqlRewriteTests
     }
 
     /// <summary>
-    /// Si el valor no se inserto porque ya estaba, el INSERT del mapa apuntaria a una fila inexistente y
-    /// romperia FK_ItemValuesMap_ItemValues_ItemValueId, que se lleva por delante todo el lote (los items
-    /// incluidos). Por eso el mapa solo se inserta cuando el valor existe de verdad.
+    /// If the value was not inserted because it already existed, the mapping INSERT would reference a
+    /// missing row and violate FK_ItemValuesMap_ItemValues_ItemValueId, failing the entire batch
+    /// (including its items). Therefore, insert a mapping only when the value actually exists.
     /// </summary>
     [Theory]
     [InlineData("""("ItemId", "ItemValueId") VALUES (@p4, @p0)""")]
@@ -202,8 +202,8 @@ public sealed class SqlRewriteTests
     }
 
     /// <summary>
-    /// Un mapa que llega solo no se toca: el valor al que apunta puede venir de una fila que ya esta
-    /// guardada, y en ese caso la clave foranea se cumple.
+    /// Leave a standalone mapping unchanged: its value may come from a row already present
+    /// in the database, in which case the foreign key is valid.
     /// </summary>
     [Fact]
     public void MappingInsertAloneKeepsItsShape()
@@ -234,7 +234,7 @@ public sealed class SqlRewriteTests
         Assert.Contains("ON CONFLICT (", command.CommandText, StringComparison.Ordinal);
     }
 
-    /// <summary>Reescribir dos veces no puede cambiar la sentencia: un comando reintentado fallaria.</summary>
+    /// <summary>Rewriting twice must not change the statement: otherwise a retried command would fail.</summary>
     [Fact]
     public void ItemValueRewriteIsIdempotent()
     {

@@ -1,7 +1,7 @@
 {
   "guid": "a2b5f3e8-4c1d-4f7a-9e6b-8d0c2f1a3b5e",
   "name": "PostgreSQL Database Provider",
-  "version": "3.2.0.6",
+  "version": "3.2.0.7",
   "targetAbi": "12.4.0.0",
   "description": "BORNIOS PostgreSQL provider with Preston's Jellyfin 12.4 compatibility, query-performance, rating-filter and grouped-ID fixes.",
   "overview": "Modified PostgreSQL backend for Jellyfin 12.4, with catalog installation and updates.",

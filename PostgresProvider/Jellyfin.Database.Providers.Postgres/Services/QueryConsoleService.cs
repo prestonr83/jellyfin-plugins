@@ -54,7 +54,7 @@ public sealed class QueryConsoleService
     {
         if (string.IsNullOrWhiteSpace(sql))
         {
-            throw new ArgumentException("La consulta está vacía.", nameof(sql));
+            throw new ArgumentException("The query is empty.", nameof(sql));
         }
 
         // Two views of the statement: the one that will be executed (comments removed, literals and quoted
@@ -64,14 +64,14 @@ public sealed class QueryConsoleService
         var statement = cleaned.Trim();
         if (statement.Length == 0)
         {
-            throw new ArgumentException("La consulta no contiene ninguna sentencia.", nameof(sql));
+            throw new ArgumentException("The query contains no statements.", nameof(sql));
         }
 
         // Dollar quoting ($$ ... $$ / $tag$ ... $tag$) is not understood by the masker below, so a literal could hide a
         // second statement from the checks. Nothing the console is meant for needs it: reject it outright.
         if (DollarQuote.IsMatch(statement))
         {
-            throw new ArgumentException("Las comillas de dólar ($$) no están permitidas en la consola.", nameof(sql));
+            throw new ArgumentException("Dollar quoting ($$) is not allowed in the console.", nameof(sql));
         }
 
         var analysis = masked.Trim();
@@ -80,7 +80,7 @@ public sealed class QueryConsoleService
         var withoutTrailingSemicolon = analysis.TrimEnd(';');
         if (withoutTrailingSemicolon.Contains(';', StringComparison.Ordinal))
         {
-            throw new ArgumentException("Solo se permite una sentencia por consulta.", nameof(sql));
+            throw new ArgumentException("Only one statement is allowed per query.", nameof(sql));
         }
 
         var candidate = withoutTrailingSemicolon.TrimStart('(').TrimStart();
@@ -90,7 +90,7 @@ public sealed class QueryConsoleService
             throw new ArgumentException(
                 string.Create(
                     CultureInfo.InvariantCulture,
-                    $"Solo se permiten consultas de lectura ({string.Join(", ", AllowedStarters)}). Se recibió '{starter}'."),
+                    $"Only read-only queries are allowed ({string.Join(", ", AllowedStarters)}). Received '{starter}'."),
                 nameof(sql));
         }
 
@@ -99,7 +99,7 @@ public sealed class QueryConsoleService
             if (ContainsKeyword(candidate, keyword))
             {
                 throw new ArgumentException(
-                    string.Create(CultureInfo.InvariantCulture, $"La consulta contiene '{keyword}', que está bloqueado en la consola."),
+                    string.Create(CultureInfo.InvariantCulture, $"The query contains '{keyword}', which is blocked in the console."),
                     nameof(sql));
             }
         }
@@ -200,7 +200,7 @@ public sealed class QueryConsoleService
         PostgresLog.Info(
             string.Create(
                 CultureInfo.InvariantCulture,
-                $"[QueryConsole] {(explain ? "PLAN" : "SELECT")} {rows.Count} fila(s) en {durationMs} ms{(truncated ? " (truncado)" : string.Empty)}: {Preview(statement)}"));
+                $"[QueryConsole] {(explain ? "PLAN" : "SELECT")} {rows.Count} row(s) in {durationMs} ms{(truncated ? " (truncated)" : string.Empty)}: {Preview(statement)}"));
 
         return new QueryResult(columns, rows, rows.Count, truncated, durationMs);
     }

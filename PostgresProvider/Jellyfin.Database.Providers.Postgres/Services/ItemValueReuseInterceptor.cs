@@ -93,8 +93,8 @@ public sealed class ItemValueReuseInterceptor : SaveChangesInterceptor
         if (Interlocked.Increment(ref _announced) == 1)
         {
             PostgresLog.Info(
-                $"[ItemValues] {remapped.Count} valor(es) ya existentes reutilizados en lugar de insertarlos: " +
-                "el lote no se pierde con 23505.");
+                $"[ItemValues] Reused {remapped.Count} existing value(s) instead of inserting them: " +
+                "the batch is preserved when handling error 23505.");
         }
 
         return remapped.Count;

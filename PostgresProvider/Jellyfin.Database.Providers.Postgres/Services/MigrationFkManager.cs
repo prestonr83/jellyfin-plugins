@@ -35,7 +35,7 @@ internal static class MigrationFkManager
     {
         var action = enable ? "ENABLE" : "DISABLE";
         var tableList = tables.ToList();
-        log($"[Triggers] {action} TRIGGER ALL en {tableList.Count} tabla(s)...");
+        log($"[Triggers] {action} TRIGGER ALL on {tableList.Count} table(s)...");
 
         var failed = 0;
         foreach (var table in tableList)
@@ -49,17 +49,17 @@ internal static class MigrationFkManager
             {
                 failed++;
                 logger.LogWarning(
-                    "No se pudo {Action} triggers en {Table}: {Error}", action, table, ex.MessageText);
+                    "Could not {Action} triggers on {Table}: {Error}", action, table, ex.MessageText);
             }
         }
 
         if (failed == 0)
         {
-            log($"[Triggers] {action} TRIGGER ALL completado.");
+            log($"[Triggers] {action} TRIGGER ALL completed.");
         }
         else
         {
-            log($"[Triggers] {action} TRIGGER ALL: {failed} tabla(s) sin permiso.");
+            log($"[Triggers] {action} TRIGGER ALL: permission denied on {failed} table(s).");
         }
     }
 

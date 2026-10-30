@@ -39,7 +39,7 @@ public sealed class PluginInstallInspectorTests : IDisposable
         var warning = Assert.Single(warnings);
         Assert.Contains("3.0.3.0", warning, StringComparison.Ordinal);
         Assert.Contains("Deleted", warning, StringComparison.Ordinal);
-        Assert.DoesNotContain("MÁS NUEVA", warning, StringComparison.Ordinal);
+        Assert.DoesNotContain("NEWER", warning, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -50,7 +50,7 @@ public sealed class PluginInstallInspectorTests : IDisposable
 
         var warning = Assert.Single(PluginInstallInspector.Inspect(assembly, new Version(3, 0, 3, 0)));
 
-        Assert.Contains("MÁS NUEVA", warning, StringComparison.Ordinal);
+        Assert.Contains("NEWER", warning, StringComparison.Ordinal);
     }
 
     [Fact]

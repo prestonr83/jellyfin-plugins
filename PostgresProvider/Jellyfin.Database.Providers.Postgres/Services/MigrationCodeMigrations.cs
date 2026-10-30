@@ -30,7 +30,7 @@ internal static class MigrationCodeMigrations
                 if (!columns.Contains(column.Name, StringComparer.OrdinalIgnoreCase))
                 {
                     throw new InvalidOperationException(
-                        $"SQLite no tiene {table.Name}.{column.Name}. Actualiza y arranca Jellyfin 12.1 con SQLite antes de importar a PostgreSQL.");
+                        $"SQLite is missing {table.Name}.{column.Name}. Upgrade and start Jellyfin 12.1 with SQLite before importing into PostgreSQL.");
                 }
             }
         }
@@ -70,7 +70,7 @@ internal static class MigrationCodeMigrations
     {
         if (codeMigrationNames.Count == 0)
         {
-            log("[CodeMigrations] No se encontraron tipos de migracion de codigo de Jellyfin; el historial no se copia.");
+            log("[CodeMigrations] No Jellyfin code migration types found; history will not be copied.");
             return;
         }
 
@@ -91,11 +91,11 @@ internal static class MigrationCodeMigrations
             copied += await insert.ExecuteNonQueryAsync().ConfigureAwait(false);
         }
 
-        log($"[CodeMigrations] {copied} de {sourceRows.Count} filas del historial SQLite son migraciones de codigo aplicadas.");
+        log($"[CodeMigrations] {copied} of {sourceRows.Count} SQLite history rows are applied code migrations.");
 
         if (copied == 0)
         {
-            log("[CodeMigrations] ADVERTENCIA: no se copio ninguna migracion de codigo; Jellyfin volvera a ejecutar rutinas que pueden necesitar library.db.");
+            log("[CodeMigrations] WARNING: no code migrations were copied; Jellyfin will rerun routines that may require library.db.");
         }
     }
 

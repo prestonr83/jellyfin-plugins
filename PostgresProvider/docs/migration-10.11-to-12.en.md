@@ -4,7 +4,6 @@ Official guide to move from **Jellyfin 10.11.x + PostgreSQL Database Provider 2.
 **Jellyfin 12.1.x + PostgreSQL Database Provider 3.0.0** without losing your library,
 users or playback data.
 
-> Spanish version (primary): [`migracion-10.11-a-12.md`](migracion-10.11-a-12.md)
 
 ---
 
@@ -314,4 +313,4 @@ minutes; disk, not CPU, is the bottleneck.
 
 - [What is new in 3.0.0 vs 2.0.1](whats-new-3.0.0.en.md)
 - [Technical guide for the Jellyfin 12.1 adaptation](JELLYFIN-12.1.md)
-- [Automated verification summary](VERIFICACION-RESUMEN.md)
+- [Automated verification summary](VERIFICATION-SUMMARY.md)

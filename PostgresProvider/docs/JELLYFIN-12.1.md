@@ -1,86 +1,87 @@
 # Jellyfin 12.1 / .NET 10
 
-## Compatibilidad
+These historical notes describe provider **3.0.0.0** for Jellyfin **12.1.x**. For the current catalog build, use the [Jellyfin 12.4 notes](JELLYFIN-12.4.md) and [fork guide](../FORK.md).
 
-Esta rama produce el proveedor **3.0.0.0**, exclusivo para Jellyfin **12.1.x**.
-Requiere .NET SDK 10 para compilar, PostgreSQL **16 o posterior** y herramientas
-`pg_dump` / `psql` compatibles con el servidor para los respaldos de actualización.
-La limpieza JSON de Jellyfin 12.1 se adapta al predicado `IS JSON` de PostgreSQL 16+.
+## Compatibility
 
-| Dependencia | Versión |
+The 12.1 provider requires .NET SDK 10 to build, PostgreSQL **16 or later**, and
+`pg_dump` / `psql` tools compatible with the server for upgrade backups.
+Jellyfin 12.1 JSON cleanup uses the PostgreSQL 16+ `IS JSON` predicate.
+
+| Dependency | Version |
 | --- | --- |
 | Jellyfin.Controller / Common / Database.Implementations | 12.1.0 |
 | EF Core / Microsoft.Data.Sqlite | 10.0.11 |
 | Npgsql.EntityFrameworkCore.PostgreSQL | 10.0.2 |
 | Framework / ABI | net10.0 / 12.1.0.0 |
 
-No instalar este paquete sobre Jellyfin 10.11. El catálogo conserva los releases
-anteriores y sus checksums; el workflow agrega el nuevo release con ABI 12.1.0.0.
+Do not install this package on Jellyfin 10.11. The upstream catalog retains older
+releases and their checksums; its workflow adds the new release with ABI 12.1.0.0.
 
-## Actualizar
+## Upgrade
 
-1. Conservar un respaldo completo de los datos y configuración de Jellyfin y un
-   `pg_dump` de PostgreSQL antes de actualizar el servidor/proveedor.
-2. Sustituir las tres DLL del plugin juntas: `Jellyfin.Database.Providers.Postgres.dll`,
-   `Npgsql.dll` y `Npgsql.EntityFrameworkCore.PostgreSQL.dll`. No copiar DLL de
-   Jellyfin, EF Core o ASP.NET desde la salida de compilación al directorio de plugins.
-3. Para una base PostgreSQL existente, Jellyfin aplica la migración incremental
-   `Jellyfin121` al arrancar. Los respaldos solicitados por las migraciones de código
-   se guardan en `{DataPath}/postgres-migration-backups`. Configurar `PgBinPath` o
-   incluir las herramientas PostgreSQL en PATH antes del arranque.
-4. Para importar SQLite, actualizar y arrancar primero esa base con Jellyfin 12.1.
-   El importador rechaza tablas/columnas antiguas antes de escribir en PostgreSQL.
-   No sustituye las migraciones de datos que debe ejecutar el servidor.
-5. Revisar inicio de sesión, bibliotecas, listas de reproducción, progreso de
-   reproducción y logs después del primer arranque real.
+1. Keep a full backup of Jellyfin data and configuration and a PostgreSQL
+   `pg_dump` before upgrading the server or provider.
+2. Replace all three plugin DLLs together: `Jellyfin.Database.Providers.Postgres.dll`,
+   `Npgsql.dll`, and `Npgsql.EntityFrameworkCore.PostgreSQL.dll`. Do not copy Jellyfin,
+   EF Core, or ASP.NET DLLs from the build output into the plugins directory.
+3. For an existing PostgreSQL database, Jellyfin applies the incremental
+   `Jellyfin121` migration at startup. Backups requested by code migrations are saved
+   in `{DataPath}/postgres-migration-backups`. Configure `PgBinPath` or add PostgreSQL
+   tools to PATH before startup.
+4. Before importing SQLite, upgrade and start that database with Jellyfin 12.1.
+   The importer rejects old tables or columns before writing to PostgreSQL.
+   It does not replace data migrations that the server must run.
+5. After the first real startup, check login, libraries, playlists, playback
+   progress, and logs.
 
-La migración conserva el identificador InitialCreate existente, convierte OwnerId y
-PrimaryVersionId a UUID, incorpora LinkedChildren y los índices actuales, elimina
-permisos/preferencias huérfanos y consolida ItemValues duplicados preservando sus
-asociaciones. No confunde ExtraIds con OriginalLanguage. Las importaciones y
-exportaciones copian únicamente migraciones de código realmente aplicadas; las
-pendientes siguen pendientes.
+The migration preserves the existing InitialCreate identifier, converts OwnerId and
+PrimaryVersionId to UUID, adds LinkedChildren and current indexes, removes orphaned
+permissions and preferences, and consolidates duplicate ItemValues while preserving
+their associations. It does not confuse ExtraIds with OriginalLanguage. Imports and
+exports copy only code migrations that were actually applied; pending migrations
+remain pending.
 
-La opción de truncado sigue reemplazando los datos de destino. Todas las tablas se
-truncan antes de copiar la primera fila para evitar pérdidas por cascadas posteriores.
-Una importación con errores de tabla se reporta como fallida.
+The truncate option still replaces destination data. All tables are truncated before
+the first row is copied to prevent data loss from later cascades. An import with
+table errors is reported as failed.
 
-Para volver de versión, restaurar el respaldo completo correspondiente. La migración
-inversa de esquema no puede recuperar columnas eliminadas ni listas duplicadas que
-la versión anterior no representaba.
+To downgrade, restore the corresponding full backup. Reversing the schema migration
+cannot recover dropped columns or duplicate playlists that the previous version
+could not represent.
 
-## Compilar y comprobar
+## Build and verify
 
 ```powershell
 dotnet build Jellyfin.Database.Providers.Postgres.sln -c Release
 dotnet test Tests/Jellyfin.Database.Providers.Postgres.Tests -c Release
 ```
 
-Las comprobaciones sin variables de entorno no abren conexiones PostgreSQL.
-Para integración, proporcionar una instancia **exclusiva de pruebas** con permiso
-para crear bases; la suite crea bases nuevas con prefijo `jellyfin_provider_test_`:
+Without environment variables, checks do not open PostgreSQL connections.
+For integration testing, provide a **dedicated test instance** with permission to
+create databases. The suite creates new databases prefixed `jellyfin_provider_test_`:
 
 ```powershell
 $env:POSTGRES_TEST_CONNECTION = 'Host=localhost;Port=55439;Database=postgres;Username=postgres'
 dotnet test Tests/Jellyfin.Database.Providers.Postgres.Tests -c Release
 ```
 
-Las pruebas cubren esquema inicial, actualización con datos, UUID, duplicados y
-asociaciones, permisos huérfanos, limpieza JSON síncrona/asíncrona, JSON malformado,
-importación/reimportación en public y schema personalizado, exportación SQLite,
-historial aplicado, rechazo de SQLite antiguo y callbacks de respaldo/restauración.
-Los fixtures PostgreSQL y SQLite se conservan para diagnóstico. No usar una
-instancia de producción para estas pruebas.
+Tests cover the initial schema, upgrades with existing data, UUIDs, duplicates and
+associations, orphaned permissions, synchronous and asynchronous JSON cleanup,
+malformed JSON, imports and reimports into public and custom schemas, SQLite export,
+applied migration history, rejection of old SQLite schemas, and backup/restore callbacks.
+PostgreSQL and SQLite fixtures are retained for diagnosis. Do not use a production
+instance for these tests.
 
-`Resources/schema.sql` es una referencia generada; el importador utiliza las
-migraciones EF, no divide ni ejecuta manualmente ese archivo.
+`Resources/schema.sql` is a generated reference. The importer uses EF migrations;
+it does not split or manually execute that file.
 
-Para regenerar SQL/migraciones con dotnet-ef 10.0.11, incluir las dependencias del
-servidor solo durante el diseño:
+To regenerate SQL or migrations with dotnet-ef 10.0.11, include server dependencies
+only during design time:
 
 ```powershell
 dotnet build Jellyfin.Database.Providers.Postgres -c Release -p:IncludeJellyfinRuntime=true
 dotnet ef migrations script --project Jellyfin.Database.Providers.Postgres --configuration Release --no-build -o Jellyfin.Database.Providers.Postgres/Resources/schema.sql
 ```
 
-Volver a compilar/publicar sin `IncludeJellyfinRuntime` para distribuir el plugin.
+Build and publish again without `IncludeJellyfinRuntime` when distributing the plugin.

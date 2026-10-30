@@ -163,7 +163,7 @@ internal static class MigrationTableCopier
             var skipped = rows.Count - inserted;
             if (skipped > 0)
             {
-                log($"  [SKIP] {pgTable}: {skipped} fila(s) omitidas (PK ya existe), {inserted} insertadas.");
+                log($"  [SKIP] {pgTable}: {skipped} row(s) skipped (primary key already exists), {inserted} inserted.");
             }
 
             return inserted;
@@ -173,11 +173,11 @@ internal static class MigrationTableCopier
             await tx.RollbackAsync().ConfigureAwait(false);
             if (rows.Count == 1)
             {
-                log($"  [SKIP] {pgTable}: fila saltada ({pgEx.SqlState}): {pgEx.MessageText}");
+                log($"  [SKIP] {pgTable}: row skipped ({pgEx.SqlState}): {pgEx.MessageText}");
                 return 0;
             }
 
-            log($"  [WARN] {pgTable}: batch de {rows.Count} filas falló ({pgEx.SqlState}), reintentando fila por fila...");
+            log($"  [WARN] {pgTable}: batch of {rows.Count} rows failed ({pgEx.SqlState}); retrying row by row...");
             long total = 0;
             foreach (var row in rows)
             {
@@ -229,7 +229,7 @@ internal static class MigrationTableCopier
                 {
                     param.NpgsqlDbType = NpgsqlDbType.Boolean;
                     param.Value = DBNull.Value;
-                    log($"  [WARN] {pgTable}.{column.Name}: boolean inválido '{strVal}' → NULL");
+                    log($"  [WARN] {pgTable}.{column.Name}: invalid boolean '{strVal}' → NULL");
                 }
 
                 break;
@@ -282,7 +282,7 @@ internal static class MigrationTableCopier
         {
             param.NpgsqlDbType = NpgsqlDbType.Bigint;
             param.Value = DBNull.Value;
-            log($"  [WARN] {pgTable}.{colName}: {pgType} inválido '{strVal}' → NULL");
+            log($"  [WARN] {pgTable}.{colName}: invalid {pgType} '{strVal}' → NULL");
         }
     }
 
@@ -298,7 +298,7 @@ internal static class MigrationTableCopier
         {
             param.NpgsqlDbType = NpgsqlDbType.Double;
             param.Value = DBNull.Value;
-            log($"  [WARN] {pgTable}.{colName}: {pgType} inválido '{strVal}' → NULL");
+            log($"  [WARN] {pgTable}.{colName}: invalid {pgType} '{strVal}' → NULL");
         }
     }
 
@@ -315,7 +315,7 @@ internal static class MigrationTableCopier
         {
             param.NpgsqlDbType = NpgsqlDbType.Unknown;
             param.Value = DBNull.Value;
-            log($"  [WARN] {pgTable}.{colName}: ARRAY inválido '{strVal}' → NULL");
+            log($"  [WARN] {pgTable}.{colName}: invalid ARRAY '{strVal}' → NULL");
         }
     }
 
@@ -354,7 +354,7 @@ internal static class MigrationTableCopier
         {
             param.NpgsqlDbType = isTz ? NpgsqlDbType.TimestampTz : NpgsqlDbType.Timestamp;
             param.Value = DBNull.Value;
-            log($"  [WARN] {pgTable}.{colName}: timestamp inválido '{strVal}' → NULL");
+            log($"  [WARN] {pgTable}.{colName}: invalid timestamp '{strVal}' → NULL");
         }
     }
 

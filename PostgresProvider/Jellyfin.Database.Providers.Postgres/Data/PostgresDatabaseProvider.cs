@@ -97,7 +97,7 @@ public sealed class PostgresDatabaseProvider : IJellyfinDatabaseProvider
     // Ensures the startup health check runs exactly once across all Initialise calls.
     private static int _startupHealthCheckFired;
 
-    /// <summary>Marca si el detalle del pipeline de EF ya se conto en INFO en este proceso.</summary>
+    /// <summary>Tracks whether EF pipeline details have already been logged at INFO in this process.</summary>
     private static int _pipelineLogged;
 
     // Ensures the unobserved task handler is attached only once.
@@ -160,15 +160,15 @@ public sealed class PostgresDatabaseProvider : IJellyfinDatabaseProvider
 
         var tunedConnStr = csb.ToString();
 
-        // EF Core llama a Initialise mas de una vez durante el arranque. Se informa UNA vez y nada mas: la
-        // conexion activa la anuncia el plugin ("Modo activo") y el pool va aqui, sin repetir ni volcar la
-        // cadena de conexion por tercera vez.
+        // EF Core calls Initialise more than once during startup. Log these details only once:
+        // the plugin reports the active connection ("Active mode"), and pool details go here,
+        // without logging the connection string a third time.
         if (Interlocked.CompareExchange(ref _pipelineLogged, 1, 0) == 0)
         {
             var assembly = typeof(PostgresDatabaseProvider).Assembly;
             Logging.PostgresLog.Info(
-                $"[Provider] Inicializado: pipeline de EF Core en marcha. Ensamblado {assembly.GetName().Version} " +
-                $"mvid={assembly.ManifestModule.ModuleVersionId:N} ruta={assembly.Location}");
+                $"[Provider] Initialized: EF Core pipeline running. Assembly {assembly.GetName().Version} " +
+                $"mvid={assembly.ManifestModule.ModuleVersionId:N} path={assembly.Location}");
             Logging.PostgresLog.Info(
                 $"[Provider] Pool: min={csb.MinPoolSize} max={csb.MaxPoolSize} " +
                 $"maxAutoPrepare={csb.MaxAutoPrepare} cmdTimeout={csb.CommandTimeout}s");
@@ -188,7 +188,7 @@ public sealed class PostgresDatabaseProvider : IJellyfinDatabaseProvider
             .AddInterceptors(BuildInterceptors());
 
         // SQLite-compatibility objects (min/max over uuid) have to exist before Jellyfin runs its
-        // first query, otherwise home-page queries fail with 'no existe la función min(uuid)'.
+        // first query, otherwise home-page queries fail with 'function min(uuid) does not exist'.
         SqliteCompatibilityBootstrap.Ensure(tunedConnStr);
 
         // Run the health check in background exactly once, even if Initialise is called
@@ -213,7 +213,7 @@ public sealed class PostgresDatabaseProvider : IJellyfinDatabaseProvider
                 }
                 catch (Exception ex)
                 {
-                    Logging.PostgresLog.Error("[HealthCheck] AUTO fall\u00f3 al iniciar", ex);
+                    Logging.PostgresLog.Error("[HealthCheck] AUTO failed at startup", ex);
                 }
             });
         }
@@ -292,17 +292,17 @@ public sealed class PostgresDatabaseProvider : IJellyfinDatabaseProvider
             if (extCount == 0)
             {
                 Logging.PostgresLog.Warn(
-                    "[ENGINE] pg_stat_statements NO est\u00e1 activo — el check SlowQueries no retornar\u00e1 datos. " +
+                    "[ENGINE] pg_stat_statements is NOT active — the SlowQueries check will return no data. " +
                     "Agrega 'pg_stat_statements' a shared_preload_libraries y reinicia PostgreSQL.");
             }
             else
             {
-                Logging.PostgresLog.Info("[ENGINE] pg_stat_statements activo \u2713 (slow-query tracking disponible).");
+                Logging.PostgresLog.Info("[ENGINE] pg_stat_statements active \u2713 (slow-query tracking available).");
             }
         }
         catch (Exception ex)
         {
-            Logging.PostgresLog.Error("[ENGINE] No se pudo consultar timezone/extensiones", ex);
+            Logging.PostgresLog.Error("[ENGINE] Could not query the time zone or extensions", ex);
         }
     }
 
@@ -361,12 +361,12 @@ public sealed class PostgresDatabaseProvider : IJellyfinDatabaseProvider
             }
 
             Logging.PostgresLog.Info(
-                $"[ESTADO] PostgreSQL {serverVersion} | base={database} ({size}) | esquema={schema} ({tables} tablas) | conexión en {connectMs} ms");
-            Logging.PostgresLog.Info($"[ESTADO] search_path={searchPath} | extensiones={string.Join(", ", extensions)}");
+                $"[STATUS] PostgreSQL {serverVersion} | database={database} ({size}) | schema={schema} ({tables} tables) | connected in {connectMs} ms");
+            Logging.PostgresLog.Info($"[STATUS] search_path={searchPath} | extensions={string.Join(", ", extensions)}");
         }
         catch (Exception ex)
         {
-            Logging.PostgresLog.Error("[ESTADO] No se pudo leer el estado de la base de datos", ex);
+            Logging.PostgresLog.Error("[STATUS] Could not read database status", ex);
         }
     }
 
@@ -384,7 +384,7 @@ public sealed class PostgresDatabaseProvider : IJellyfinDatabaseProvider
         TaskScheduler.UnobservedTaskException += (_, args) =>
         {
             Logging.PostgresLog.Error(
-                "[Runtime] Una tarea en segundo plano del plugin falló y su excepción no fue observada",
+                "[Runtime] A plugin background task failed and its exception was not observed",
                 args.Exception);
             args.SetObserved();
         };
@@ -443,7 +443,7 @@ public sealed class PostgresDatabaseProvider : IJellyfinDatabaseProvider
         // Diagnostic switch: lets an operator rule the query cache out when chasing a data problem.
         if (string.Equals(Environment.GetEnvironmentVariable("JELLYFIN_PG_DISABLE_QUERY_CACHE"), "1", StringComparison.Ordinal))
         {
-            Logging.PostgresLog.Warn("[Provider] JELLYFIN_PG_DISABLE_QUERY_CACHE=1: la caché de consultas está desactivada.");
+            Logging.PostgresLog.Warn("[Provider] JELLYFIN_PG_DISABLE_QUERY_CACHE=1: the query cache is disabled.");
         }
         else
         {
@@ -465,7 +465,7 @@ public sealed class PostgresDatabaseProvider : IJellyfinDatabaseProvider
     /// <inheritdoc/>
     public void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
-        // Todas las columnas de fecha son timestamptz: se lee siempre como UTC para que Jellyfin escriba la 'Z'.
+        // All date columns are timestamptz: always read as UTC so Jellyfin writes the 'Z' suffix.
         configurationBuilder.Properties<DateTime>().HaveConversion<UtcDateTimeConverter>();
         configurationBuilder.Properties<DateTime?>().HaveConversion<UtcDateTimeConverter>();
     }
@@ -529,8 +529,8 @@ public sealed class PostgresDatabaseProvider : IJellyfinDatabaseProvider
         // ReplaceExistingObjects here can silently overwrite a production database after an unrelated
         // migration error. Keep the backup intact and require the operator to use RestoreBackup explicitly.
         Logging.PostgresLog.Warn(
-            $"[Restore] Restauración automática bloqueada para {key}. "
-            + "Use la acción explícita RestoreBackup y confirme ReplaceExistingObjects si corresponde.");
+            $"[Restore] Automatic restore blocked for {key}. "
+            + "Use the explicit RestoreBackup action and confirm ReplaceExistingObjects if appropriate.");
         await Task.CompletedTask.ConfigureAwait(false);
     }
 
@@ -568,7 +568,7 @@ public sealed class PostgresDatabaseProvider : IJellyfinDatabaseProvider
         // The rows changed outside EF's change tracker, so no write command of this process reaches the
         // cache interceptor: without this purge a restore could serve rows that no longer exist.
         HomeQueryCacheInterceptor.Purge();
-        Logging.PostgresLog.Info($"[Purge] Base de datos vaciada: {tables.Count} tablas (TRUNCATE ... RESTART IDENTITY CASCADE).");
+        Logging.PostgresLog.Info($"[Purge] Database emptied: {tables.Count} tables (TRUNCATE ... RESTART IDENTITY CASCADE).");
     }
 
     /// <inheritdoc/>
@@ -663,47 +663,47 @@ public sealed class PostgresDatabaseProvider : IJellyfinDatabaseProvider
         ILogger logger,
         CancellationToken ct)
     {
-        Logging.PostgresLog.Info($"[Optimization] INICIO: enableSearch={enableSearch} enableVacuum={enableVacuum}");
+        Logging.PostgresLog.Info($"[Optimization] START: enableSearch={enableSearch} enableVacuum={enableVacuum}");
 
         using var conn = new NpgsqlConnection(connectionString);
         await conn.OpenAsync(ct).ConfigureAwait(false);
 
         _trgmAvailable = await EnsureTrgmAsync(conn, logger, ct).ConfigureAwait(false);
-        Logging.PostgresLog.Info($"[Optimization] pg_trgm: {(_trgmAvailable ? "disponible \u2713" : "no disponible \u2717 \u2014 InstantSearch usar\u00e1 ILIKE")}");
+        Logging.PostgresLog.Info($"[Optimization] pg_trgm: {(_trgmAvailable ? "available \u2713" : "unavailable \u2717 \u2014 InstantSearch will use ILIKE")}");
 
         if (enableSearch && _trgmAvailable)
         {
-            Logging.PostgresLog.Info($"[Optimization] Aplicando {GinIndexDefinitions.Length} \u00edndices GIN trigram...");
+            Logging.PostgresLog.Info($"[Optimization] Applying {GinIndexDefinitions.Length} GIN trigram indexes...");
             await ApplySearchIndexesAsync(conn, logger, ct).ConfigureAwait(false);
-            Logging.PostgresLog.Info("[Optimization] \u00cdndices GIN trigram aplicados (IF NOT EXISTS \u2014 instant\u00e1neo si ya exist\u00edan).");
+            Logging.PostgresLog.Info("[Optimization] GIN trigram indexes applied (IF NOT EXISTS \u2014 instant if already present).");
         }
         else if (enableSearch && !_trgmAvailable)
         {
-            Logging.PostgresLog.Warn("[Optimization] \u00cdndices GIN omitidos \u2014 pg_trgm no disponible. Ejecuta: CREATE EXTENSION pg_trgm;");
+            Logging.PostgresLog.Warn("[Optimization] GIN indexes skipped \u2014 pg_trgm is unavailable. Run: CREATE EXTENSION pg_trgm;");
         }
 
         // Navigation indexes improve home-page, library-browser and resume performance
         // regardless of pg_trgm availability.
-        Logging.PostgresLog.Info($"[Optimization] Aplicando {NavigationIndexDefinitions.Length} \u00edndices de navegaci\u00f3n parciales...");
+        Logging.PostgresLog.Info($"[Optimization] Applying {NavigationIndexDefinitions.Length} partial navigation indexes...");
         await ApplyNavigationIndexesAsync(conn, logger, ct).ConfigureAwait(false);
-        Logging.PostgresLog.Info("[Optimization] \u00cdndices de navegaci\u00f3n aplicados (home-page, library-browser, resume).");
+        Logging.PostgresLog.Info("[Optimization] Navigation indexes applied (home page, library browser, resume).");
 
         // Query-planner memory hints (work_mem) for sort-heavy queries.
         await ApplyServerMemoryTuningAsync(conn, logger, ct).ConfigureAwait(false);
-        Logging.PostgresLog.Info("[Optimization] Ajuste de memoria de sesi\u00f3n aplicado (work_mem=16MB).");
+        Logging.PostgresLog.Info("[Optimization] Session memory tuning applied (work_mem=16MB).");
 
         if (enableVacuum)
         {
-            Logging.PostgresLog.Info("[Optimization] Aplicando autovacuum tuning en tablas cr\u00edticas...");
+            Logging.PostgresLog.Info("[Optimization] Applying autovacuum tuning to critical tables...");
             await ApplyAutovacuumTuningAsync(conn, logger, ct).ConfigureAwait(false);
-            Logging.PostgresLog.Info($"[Optimization] Autovacuum tuning aplicado en: {string.Join(", ", AutovacuumTables)}");
+            Logging.PostgresLog.Info($"[Optimization] Autovacuum tuning applied to: {string.Join(", ", AutovacuumTables)}");
         }
 
         // Try to activate pg_stat_statements for slow-query visibility.
         // Requires pg_stat_statements in shared_preload_libraries (needs restart if not already active).
         await TryActivateStatStatementsAsync(conn, logger, ct).ConfigureAwait(false);
 
-        Logging.PostgresLog.Info("[Optimization] COMPLETADO. InstantSearch activo, home-page optimizada, autovacuum tuned.");
+        Logging.PostgresLog.Info("[Optimization] COMPLETED. InstantSearch enabled, home page optimized, autovacuum tuned.");
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -728,7 +728,7 @@ public sealed class PostgresDatabaseProvider : IJellyfinDatabaseProvider
             // clear warning and continues with the ILIKE fallback.
             using var create = new NpgsqlCommand("CREATE EXTENSION IF NOT EXISTS pg_trgm;", conn);
             await create.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-            Logging.PostgresLog.Info("[Optimization] pg_trgm activado ✓.");
+            Logging.PostgresLog.Info("[Optimization] pg_trgm enabled ✓.");
             return true;
         }
         catch (PostgresException pgEx) when (pgEx.SqlState is "42501" or "0A000" or "58P01")
@@ -877,7 +877,7 @@ public sealed class PostgresDatabaseProvider : IJellyfinDatabaseProvider
 
             if (count > 0)
             {
-                Logging.PostgresLog.Info("[Optimization] pg_stat_statements: ya activo \u2713 (slow-query tracking disponible).");
+                Logging.PostgresLog.Info("[Optimization] pg_stat_statements: already active \u2713 (slow-query tracking available).");
                 return;
             }
 
@@ -885,14 +885,14 @@ public sealed class PostgresDatabaseProvider : IJellyfinDatabaseProvider
             using var createCmd = new NpgsqlCommand(
                 "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;", conn);
             await createCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-            Logging.PostgresLog.Info("[Optimization] pg_stat_statements activado \u2713 (agrega 'pg_stat_statements' a shared_preload_libraries para que persista entre reinicios).");
+            Logging.PostgresLog.Info("[Optimization] pg_stat_statements enabled \u2713 (add 'pg_stat_statements' to shared_preload_libraries to persist across restarts).");
         }
         catch (PostgresException pgEx) when (pgEx.SqlState is "55P02" or "42501")
         {
             // 55P02 = extension requires restart, 42501 = insufficient privileges
             Logging.PostgresLog.Warn(
-                $"[Optimization] pg_stat_statements no pudo activarse autom\u00e1ticamente ({pgEx.MessageText}). " +
-                "Para activarlo manualmente: agrega 'pg_stat_statements' a shared_preload_libraries en postgresql.conf y reinicia PostgreSQL.");
+                $"[Optimization] pg_stat_statements could not be enabled automatically ({pgEx.MessageText}). " +
+                "To enable it manually, add 'pg_stat_statements' to shared_preload_libraries in postgresql.conf and restart PostgreSQL.");
         }
         catch (Exception ex)
         {

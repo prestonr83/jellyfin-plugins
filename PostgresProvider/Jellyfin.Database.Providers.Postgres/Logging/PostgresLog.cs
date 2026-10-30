@@ -242,7 +242,7 @@ internal static class PostgresLog
         {
             _task = task;
             _stopwatch = Stopwatch.StartNew();
-            Debug(string.Format(CultureInfo.InvariantCulture, "[{0}] Iniciando.", task));
+            Debug(string.Format(CultureInfo.InvariantCulture, "[{0}] Starting.", task));
         }
 
         /// <summary>
@@ -264,7 +264,7 @@ internal static class PostgresLog
             _done = true;
             Info(string.Format(
                 CultureInfo.InvariantCulture,
-                "[{0}] Completado en {1} ms: {2}",
+                "[{0}] Completed in {1} ms: {2}",
                 _task,
                 _stopwatch.ElapsedMilliseconds,
                 summary));
@@ -284,7 +284,7 @@ internal static class PostgresLog
             Error(
                 string.Format(
                     CultureInfo.InvariantCulture,
-                    "[{0}] Falló tras {1} ms: {2}",
+                    "[{0}] Failed after {1} ms: {2}",
                     _task,
                     _stopwatch.ElapsedMilliseconds,
                     summary),

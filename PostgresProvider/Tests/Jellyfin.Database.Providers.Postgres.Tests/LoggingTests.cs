@@ -19,18 +19,18 @@ public sealed class LoggingTests
         Exception thrown;
         try
         {
-            throw new InvalidOperationException("fallo de prueba del logger");
+            throw new InvalidOperationException("logger test failure");
         }
         catch (InvalidOperationException ex)
         {
             thrown = ex;
         }
 
-        PostgresLog.Error("[Test] contexto del fallo", thrown);
+        PostgresLog.Error("[Test] failure context", thrown);
 
         var text = ReadAppended(path, offset);
         Assert.Contains("[ERROR]", text, StringComparison.Ordinal);
-        Assert.Contains("fallo de prueba del logger", text, StringComparison.Ordinal);
+        Assert.Contains("logger test failure", text, StringComparison.Ordinal);
         Assert.Contains("System.InvalidOperationException", text, StringComparison.Ordinal);
 
         // The stack trace is what makes the failure diagnosable.
@@ -52,7 +52,7 @@ public sealed class LoggingTests
             tableName: "UserData",
             constraintName: "PK_UserData");
 
-        PostgresLog.Error("[Test] violación de PK", exception);
+        PostgresLog.Error("[Test] primary key violation", exception);
 
         var text = ReadAppended(path, offset);
         Assert.Contains("SqlState=23505", text, StringComparison.Ordinal);

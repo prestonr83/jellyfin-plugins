@@ -78,7 +78,7 @@ public sealed class MaintenanceBackupService
             _logger.LogInformation("Starting PostgreSQL backup with pg_dump to {Path}", sqlFilePath);
         }
 
-        PostgresLog.Info($"[Backup] INICIO: pg_dump → {sqlFilePath}");
+        PostgresLog.Info($"[Backup] START: pg_dump → {sqlFilePath}");
 
         var psi = CreateProcessStartInfo(safeExecutable, args);
 
@@ -121,7 +121,7 @@ public sealed class MaintenanceBackupService
                 _logger.LogInformation("PostgreSQL backup completed at {Path} ({Size})", sqlFilePath, sqlSize);
             }
 
-            PostgresLog.Info($"[Backup] COMPLETADO: {sqlFilePath} ({sqlSize})");
+            PostgresLog.Info($"[Backup] COMPLETED: {sqlFilePath} ({sqlSize})");
             return sqlFilePath;
         }
 
@@ -143,7 +143,7 @@ public sealed class MaintenanceBackupService
             _logger.LogInformation("PostgreSQL backup completed at {Path} ({Size})", zipPath, zipSize);
         }
 
-        PostgresLog.Info($"[Backup] COMPLETADO (ZIP): {zipPath} ({zipSize})");
+        PostgresLog.Info($"[Backup] COMPLETED (ZIP): {zipPath} ({zipSize})");
         return zipPath;
     }
 
@@ -210,7 +210,7 @@ public sealed class MaintenanceBackupService
                 backupFilePath,
                 replaceExistingObjects);
             var sourceSize = MaintenanceService.FormatBytes(GetFileSize(backupFilePath));
-            PostgresLog.Info($"[Restore] INICIO: {backupFilePath} ({sourceSize}) replaceExisting={replaceExistingObjects}");
+            PostgresLog.Info($"[Restore] START: {backupFilePath} ({sourceSize}) replaceExisting={replaceExistingObjects}");
 
             var psi = CreateProcessStartInfo(safeRestoreExe, args);
 
@@ -250,7 +250,7 @@ public sealed class MaintenanceBackupService
                 catch (IOException ex)
                 {
                     // Best-effort cleanup: keep a trace, it explains a leftover temp directory.
-                    PostgresLog.Debug($"[Backup] No se pudo borrar el directorio temporal {tempDir}: {ex.Message}");
+                    PostgresLog.Debug($"[Backup] Could not delete temporary directory {tempDir}: {ex.Message}");
                 }
             }
         }

@@ -101,7 +101,7 @@ public sealed class MigrationService : IDisposable
         PostgresLog.Info("[ENGINE SWITCH] SQLite \u2192 PostgreSQL");
         PostgresLog.Info($"[ENGINE SWITCH] Origen SQLite: {sqlitePath}");
         PostgresLog.Info($"[ENGINE SWITCH] Schema PG: {schema} | Batch: {batchSize} | Truncate: {truncate}");
-        PostgresLog.Info($"[Migration] INICIO: {sqlitePath} \u2192 PostgreSQL schema={schema} batch={batchSize} truncate={truncate}");
+        PostgresLog.Info($"[Migration] START: {sqlitePath} \u2192 PostgreSQL schema={schema} batch={batchSize} truncate={truncate}");
 
         _ = Task.Run(async () =>
         {
@@ -116,8 +116,8 @@ public sealed class MigrationService : IDisposable
                     ApplicationPaths: applicationPaths);
                 await MigrationEngine.RunAsync(options, this, CancellationToken.None).ConfigureAwait(false);
                 _isCompleted = true;
-                PostgresLog.Info($"[Migration] COMPLETADA: {_migratedRows:N0} filas migradas.");
-                PostgresLog.Info("[ENGINE SWITCH] SQLite \u2192 PostgreSQL: COMPLETADO. Activa PostgreSQL desde la UI para finalizar el cambio.");
+                PostgresLog.Info($"[Migration] COMPLETED: {_migratedRows:N0} rows migrated.");
+                PostgresLog.Info("[ENGINE SWITCH] SQLite \u2192 PostgreSQL: COMPLETED. Activate PostgreSQL in the dashboard to finish switching engines.");
             }
             catch (Exception ex)
             {

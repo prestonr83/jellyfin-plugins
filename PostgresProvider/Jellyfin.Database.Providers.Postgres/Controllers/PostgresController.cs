@@ -210,7 +210,7 @@ public class PostgresController : ControllerBase
 
         if (string.IsNullOrWhiteSpace(request.ConnectionString))
         {
-            return BadRequest(new { Success = false, Error = "La cadena de conexión es obligatoria." });
+            return BadRequest(new { Success = false, Error = "A connection string is required." });
         }
 
         // The panel shows the password masked; a masked value means "keep the one already stored".
@@ -222,7 +222,7 @@ public class PostgresController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new { Success = false, Error = "La cadena de conexión no es válida: " + ex.Message });
+            return BadRequest(new { Success = false, Error = "The connection string is invalid: " + ex.Message });
         }
 
         // When PostgreSQL is the running engine the next restart reads this connection string from database.xml,
@@ -237,13 +237,13 @@ public class PostgresController : ControllerBase
             var testError = await MaintenanceService.TestConnectionAsync(tunedForTest, cancellationToken).ConfigureAwait(false);
             if (testError is not null)
             {
-                return BadRequest(new { Success = false, Error = "No se guardó: la conexión falló y Jellyfin no podría arrancar con ella. " + testError });
+                return BadRequest(new { Success = false, Error = "Settings were not saved: the connection failed and would prevent Jellyfin from starting. " + testError });
             }
         }
 
         if (request.MaxPoolSize > 0 && request.MinPoolSize > request.MaxPoolSize)
         {
-            return BadRequest(new { Success = false, Error = "El tamaño máximo del pool no puede ser menor que el mínimo." });
+            return BadRequest(new { Success = false, Error = "The maximum pool size cannot be smaller than the minimum." });
         }
 
         plugin.Configuration.ConnectionString = request.ConnectionString;
@@ -303,8 +303,8 @@ public class PostgresController : ControllerBase
 
             PostgresPlugin.WriteDatabaseXml(_appPaths, tuned, plugin.Configuration.CommandTimeout);
             Logging.PostgresLog.Info(
-                "[ENGINE SWITCH] database.xml actualizado con la configuracion guardada "
-                + "(pool y timeout incluidos). Reinicia Jellyfin para aplicarla.");
+                "[ENGINE SWITCH] database.xml updated with the saved configuration "
+                + "(including pool and timeout settings). Restart Jellyfin to apply it.");
         }
 
         return Ok(new { Success = true });
@@ -449,7 +449,7 @@ public class PostgresController : ControllerBase
         if (connectionError is not null)
         {
             _logger.LogWarning("PostgreSQL activation rejected because the connection test failed: {Error}", connectionError);
-            Logging.PostgresLog.Warn($"[ENGINE SWITCH] Activación rechazada: prueba de conexión falló: {connectionError}");
+            Logging.PostgresLog.Warn($"[ENGINE SWITCH] Activation rejected: connection test failed: {connectionError}");
             return BadRequest(new { Error = $"PostgreSQL connection test failed: {connectionError}" });
         }
 
@@ -489,7 +489,7 @@ public class PostgresController : ControllerBase
                 // A restart that fails here would leave the user with a plugin that is configured
                 // for PostgreSQL but a server still running SQLite, so it has to be logged.
                 _logger.LogError(ex, "Failed to restart Jellyfin after activating PostgreSQL.");
-                Logging.PostgresLog.Error("[ENGINE SWITCH] No se pudo reiniciar Jellyfin tras activar PostgreSQL", ex);
+                Logging.PostgresLog.Error("[ENGINE SWITCH] Could not restart Jellyfin after activating PostgreSQL", ex);
             }
         });
 
@@ -514,7 +514,7 @@ public class PostgresController : ControllerBase
         {
             var message = $"SQLite validation failed; PostgreSQL remains active. {sqliteValidationError}";
             _logger.LogWarning("PostgreSQL to SQLite switch rejected: {Error}", sqliteValidationError);
-            Logging.PostgresLog.Warn($"[ENGINE SWITCH] Reversión rechazada: {sqliteValidationError}");
+            Logging.PostgresLog.Warn($"[ENGINE SWITCH] Rollback rejected: {sqliteValidationError}");
             return Conflict(new { Error = message });
         }
 
@@ -529,13 +529,13 @@ public class PostgresController : ControllerBase
                 : "(file not found)";
 
             Logging.PostgresLog.Info("[ENGINE SWITCH] PostgreSQL → SQLite");
-            Logging.PostgresLog.Info($"[ENGINE SWITCH] database.xml eliminado — Jellyfin usará SQLite al reiniciar.");
+            Logging.PostgresLog.Info($"[ENGINE SWITCH] database.xml deleted — Jellyfin will use SQLite after restarting.");
             Logging.PostgresLog.Info($"[ENGINE SWITCH] SQLite destino: {sqlitePath} ({sqliteSize})");
-            Logging.PostgresLog.Info("[ENGINE SWITCH] Reiniciando Jellyfin...");
+            Logging.PostgresLog.Info("[ENGINE SWITCH] Restarting Jellyfin...");
         }
         else
         {
-            Logging.PostgresLog.Warn("[ENGINE SWITCH] Deactivate llamado pero database.xml no existía.");
+            Logging.PostgresLog.Warn("[ENGINE SWITCH] Deactivate called, but database.xml did not exist.");
         }
 
         _ = Task.Run(async () =>
@@ -548,7 +548,7 @@ public class PostgresController : ControllerBase
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to restart Jellyfin after reverting to SQLite.");
-                Logging.PostgresLog.Error("[ENGINE SWITCH] No se pudo reiniciar Jellyfin tras volver a SQLite", ex);
+                Logging.PostgresLog.Error("[ENGINE SWITCH] Could not restart Jellyfin after switching back to SQLite", ex);
             }
         });
 
@@ -624,7 +624,7 @@ public class PostgresController : ControllerBase
         {
             var result = await MaintenanceService.TruncateAllTablesAsync(connStr, cancellationToken)
                 .ConfigureAwait(false);
-            Logging.PostgresLog.Info($"[Maintenance] TruncateAllTables: {result.TablesAffected} tablas truncadas.");
+            Logging.PostgresLog.Info($"[Maintenance] TruncateAllTables: {result.TablesAffected} tables truncated.");
             return Ok(result);
         }
         catch (Exception ex)
@@ -659,7 +659,7 @@ public class PostgresController : ControllerBase
             .ConfigureAwait(false);
 
         Logging.PostgresLog.Info(
-            $"[Stats] BD: {dbSize} | Conexiones activas: {connCount} | Tablas: {tables.Count} | Schema: {effectiveSchema}");
+            $"[Stats] Database: {dbSize} | Active connections: {connCount} | Tables: {tables.Count} | Schema: {effectiveSchema}");
 
         return Ok(new
         {
@@ -687,7 +687,7 @@ public class PostgresController : ControllerBase
         {
             await _maintenanceService.VacuumAnalyzeAsync(connStr, cancellationToken).ConfigureAwait(false);
             sw.Stop();
-            var msg = $"VACUUM ANALYZE completado en {sw.Elapsed.TotalSeconds:F1}s.";
+            var msg = $"VACUUM ANALYZE completed in {sw.Elapsed.TotalSeconds:F1}s.";
             return Ok(new { Status = msg, DurationSeconds = sw.Elapsed.TotalSeconds });
         }
         catch (Exception ex)
@@ -716,7 +716,7 @@ public class PostgresController : ControllerBase
         {
             await _maintenanceService.ReindexAsync(connStr, cancellationToken).ConfigureAwait(false);
             sw.Stop();
-            var msg = $"REINDEX DATABASE completado en {sw.Elapsed.TotalSeconds:F1}s.";
+            var msg = $"REINDEX DATABASE completed in {sw.Elapsed.TotalSeconds:F1}s.";
             return Ok(new { Status = msg, DurationSeconds = sw.Elapsed.TotalSeconds });
         }
         catch (Exception ex)
@@ -892,7 +892,7 @@ public class PostgresController : ControllerBase
         var minKeep = request?.MinKeep ?? config?.BackupRetentionMinKeep ?? BackupRetentionService.DefaultMinKeep;
         if (days <= 0)
         {
-            return BadRequest(new { Success = false, Error = "Define primero cuántos días se conservan los respaldos (mayor que 0)." });
+            return BadRequest(new { Success = false, Error = "First set the backup retention period in days (greater than 0)." });
         }
 
         var dir = string.IsNullOrWhiteSpace(config?.BackupDirectory)
@@ -1036,8 +1036,8 @@ public class PostgresController : ControllerBase
             {
                 return BadRequest(new
                 {
-                    Error = "No se pudo crear el schema SQLite. " +
-                            "Asegúrate de que exista un jellyfin.db válido como fuente del schema."
+                    Error = "Could not create the SQLite schema. " +
+                            "Make sure a valid jellyfin.db exists as the schema source."
                 });
             }
         }
@@ -1208,7 +1208,7 @@ public class PostgresController : ControllerBase
             {
                 // The job runs unattended after the 202 response, so nothing else can surface it.
                 _logger.LogError(ex, "Background database optimization job failed.");
-                Logging.PostgresLog.Error("[Optimization] El trabajo en segundo plano fall\u00f3", ex);
+                Logging.PostgresLog.Error("[Optimization] The background task failed", ex);
             }
         });
 
@@ -1373,17 +1373,17 @@ public class PostgresController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            Logging.PostgresLog.Warn($"[QueryConsole] Consulta rechazada: {ex.Message}");
+            Logging.PostgresLog.Warn($"[QueryConsole] Query rejected: {ex.Message}");
             return BadRequest(new { Success = false, Error = ex.Message });
         }
         catch (Npgsql.PostgresException ex)
         {
-            Logging.PostgresLog.Error($"[QueryConsole] PostgreSQL rechazó la consulta ({ex.SqlState})", ex);
+            Logging.PostgresLog.Error($"[QueryConsole] PostgreSQL rejected the query ({ex.SqlState})", ex);
             return BadRequest(new { Success = false, Error = $"({ex.SqlState}) {ex.MessageText}" });
         }
         catch (Exception ex)
         {
-            Logging.PostgresLog.Error("[QueryConsole] Error ejecutando la consulta", ex);
+            Logging.PostgresLog.Error("[QueryConsole] Error executing the query", ex);
             return BadRequest(new { Success = false, Error = ex.Message });
         }
     }
@@ -1418,17 +1418,17 @@ public class PostgresController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            Logging.PostgresLog.Warn($"[PluginSchemas] Inspección rechazada: {ex.Message}");
+            Logging.PostgresLog.Warn($"[PluginSchemas] Inspection rejected: {ex.Message}");
             return BadRequest(new { Error = ex.Message });
         }
         catch (Npgsql.PostgresException ex)
         {
-            Logging.PostgresLog.Error($"[PluginSchemas] PostgreSQL rechazó la inspección ({ex.SqlState})", ex);
+            Logging.PostgresLog.Error($"[PluginSchemas] PostgreSQL rejected the inspection ({ex.SqlState})", ex);
             return BadRequest(new { Error = $"({ex.SqlState}) {ex.MessageText}" });
         }
         catch (Exception ex)
         {
-            Logging.PostgresLog.Error("[PluginSchemas] Error inspeccionando esquema privado", ex);
+            Logging.PostgresLog.Error("[PluginSchemas] Error inspecting the private schema", ex);
             return BadRequest(new { Error = ex.Message });
         }
     }
@@ -1453,12 +1453,12 @@ public class PostgresController : ControllerBase
         }
         catch (Npgsql.PostgresException ex)
         {
-            Logging.PostgresLog.Error($"[PluginSchemas] PostgreSQL rechazó el mantenimiento ({ex.SqlState})", ex);
+            Logging.PostgresLog.Error($"[PluginSchemas] PostgreSQL rejected maintenance ({ex.SqlState})", ex);
             return BadRequest(new { Error = $"({ex.SqlState}) {ex.MessageText}" });
         }
         catch (Exception ex)
         {
-            Logging.PostgresLog.Error("[PluginSchemas] Error en mantenimiento de esquema privado", ex);
+            Logging.PostgresLog.Error("[PluginSchemas] Error maintaining the private schema", ex);
             return BadRequest(new { Error = ex.Message });
         }
     }

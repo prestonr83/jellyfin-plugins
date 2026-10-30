@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Xunit;
 
@@ -5,7 +6,7 @@ namespace Jellyfin.Database.Providers.Postgres.Tests;
 
 /// <summary>
 /// The dashboard page is a single embedded HTML file, so nothing at compile time checks that the ids the
-/// script reaches for exist, that every tab has a pane, that both dictionaries carry the same keys, or that
+/// script reaches for exist, that every tab has a pane, that every message has English text, or that
 /// the embedded resource is the one the plugin advertises. These tests cover exactly that.
 /// </summary>
 public sealed class WebPageTests
@@ -35,27 +36,26 @@ public sealed class WebPageTests
     }
 
     [Fact]
-    public void BothDictionariesContainEveryTranslatedKey()
+    public void EveryDashboardMessageHasEnglishText()
     {
-        var englishStart = Html.IndexOf("en: {", StringComparison.Ordinal);
-        var spanishStart = Html.IndexOf("es: {", StringComparison.Ordinal);
-        var dictionaryEnd = Html.IndexOf("function detectLang", StringComparison.Ordinal);
+        const string declaration = "var STRINGS = ";
+        var dictionaryStart = Html.IndexOf(declaration, StringComparison.Ordinal);
+        var dictionaryEnd = Html.IndexOf("function t(", dictionaryStart, StringComparison.Ordinal);
 
-        Assert.True(englishStart > 0 && spanishStart > englishStart && dictionaryEnd > spanishStart,
-            "No se pudieron delimitar los diccionarios i18n del panel.");
+        Assert.True(dictionaryStart > 0 && dictionaryEnd > dictionaryStart,
+            "Could not locate the dashboard message dictionary.");
 
-        // The blocks start after their own header, so "en:"/"es:" are not taken for keys.
-        var english = Keys(Html[(englishStart + "en: {".Length)..spanishStart]);
-        var spanish = Keys(Html[(spanishStart + "es: {".Length)..dictionaryEnd]);
+        using var dictionary = JsonDocument.Parse(Html[(dictionaryStart + declaration.Length)..dictionaryEnd].TrimEnd().TrimEnd(';'));
+        var english = dictionary.RootElement.EnumerateObject()
+            .ToDictionary(property => property.Name, property => property.Value.GetString(), StringComparer.Ordinal);
 
-        // A key missing from one of the two dictionaries shows up as an untranslated panel.
-        Assert.Equal(
-            english.OrderBy(key => key, StringComparer.Ordinal),
-            spanish.OrderBy(key => key, StringComparer.Ordinal));
+        Assert.NotEmpty(english);
+        Assert.All(english.Values, value => Assert.False(string.IsNullOrWhiteSpace(value)));
+        Assert.Contains("<html lang=\"en\">", Html, StringComparison.Ordinal);
 
         // The lookbehind keeps calls like createElement('th') from being mistaken for t('th').
         var used = Matches("(?<![A-Za-z0-9_])t\\('([a-z0-9_]+)'").ToHashSet(StringComparer.Ordinal);
-        var untranslated = used.Except(english).OrderBy(key => key, StringComparer.Ordinal).ToArray();
+        var untranslated = used.Except(english.Keys).OrderBy(key => key, StringComparer.Ordinal).ToArray();
 
         Assert.Empty(untranslated);
     }
@@ -88,7 +88,7 @@ public sealed class WebPageTests
 
         var statusStart = Html.IndexOf("function loadStatus()", StringComparison.Ordinal);
         var statusEnd = Html.IndexOf("function switchToTab", statusStart, StringComparison.Ordinal);
-        Assert.True(statusStart >= 0 && statusEnd > statusStart, "No se pudo aislar loadStatus.");
+        Assert.True(statusStart >= 0 && statusEnd > statusStart, "Could not isolate loadStatus.");
         Assert.DoesNotContain("SqliteValidation", Html[statusStart..statusEnd], StringComparison.Ordinal);
     }
 
@@ -97,8 +97,4 @@ public sealed class WebPageTests
             .Select(match => match.Groups[1].Value)
             .ToHashSet(StringComparer.Ordinal);
 
-    private static HashSet<string> Keys(string dictionaryBlock)
-        => Regex.Matches(dictionaryBlock, @"^\s*([a-z0-9_]+):", RegexOptions.Multiline | RegexOptions.CultureInvariant)
-            .Select(match => match.Groups[1].Value)
-            .ToHashSet(StringComparer.Ordinal);
 }

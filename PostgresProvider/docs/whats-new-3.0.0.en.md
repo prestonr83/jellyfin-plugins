@@ -4,7 +4,6 @@ Technical comparison between the **2.x** line (Jellyfin 10.11.x, .NET 9) and **3
 (Jellyfin 12.1.x, .NET 10). Every item is taken from the code and the commits on branch
 `release/V3`.
 
-> Spanish version (primary): [`novedades-3.0.0.md`](novedades-3.0.0.md)
 
 ---
 
@@ -79,14 +78,14 @@ The hand-made runner was retired in favour of a standard suite runnable with `do
 | `SqlRewriteTests` | 10.11 → 12.1 SQL rewriting is idempotent and scoped |
 | `QueryConsoleTests` | Accepts read-only statements, rejects mutations and multi-statement input |
 | `LoggingTests` | The log keeps level, message and stack trace; PostgreSQL detail reaches the file |
-| `WebPageTests` | Panel integrity: element ids, symmetric ES/EN i18n keys |
+| `WebPageTests` | Panel integrity: element ids and message coverage (originally paired language dictionaries; now a single English dictionary) |
 | `AdvancedOptionTests` | Pool and timeout: the connection string wins, configuration fills gaps |
 | `PostgresIntegrationTests` | Real integration: initial schema, import/export, purge, backups |
 
 Also:
 
-- `Tools/Generar-ResumenEjecutivo.ps1` generates
-  [`VERIFICACION-RESUMEN.md`](VERIFICACION-RESUMEN.md) from the real `.trx`, grouped per class
+- `Tools/Generate-VerificationSummary.ps1` generates
+  [`VERIFICATION-SUMMARY.md`](VERIFICATION-SUMMARY.md) from the real `.trx`, grouped per class
   with a traffic light per result.
 - `.github/workflows/verification.yml` runs the suite against a PostgreSQL 17 service and
   publishes the summary in the job *Summary* tab.

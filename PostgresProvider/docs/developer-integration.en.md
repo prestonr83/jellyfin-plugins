@@ -2,8 +2,6 @@
 
 PG Provider gives Jellyfin plugins private, managed and observable PostgreSQL storage without exposing the connection string or Jellyfin's `public` schema.
 
-![Integrations tab](../Screenshots/Tab-Intergations.png)
-
 The **🧩 Integrations** tab shows which plugins use the provider, their storage and tables, a bounded data preview, and the maintenance policy selected by the administrator.
 
 ## Isolation model
@@ -98,4 +96,4 @@ These policies are administrative, not part of the consumer contract. A plugin c
 
 Discuss public-contract changes in an issue before implementation to preserve compatibility. Integration tests, observability improvements, documentation and real-world private-schema plugin use cases are welcome.
 
-See the [Spanish guide](integracion-desarrolladores.md).
+See the [provider guide](../README.md) for installation and dashboard settings.

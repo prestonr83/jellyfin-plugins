@@ -42,7 +42,7 @@ public class PostgresPlugin : BasePlugin<PluginConfiguration>, IHasWebPages
         InstallWarnings = PluginInstallInspector.Inspect(typeof(PostgresPlugin).Assembly.Location, typeof(PostgresPlugin).Assembly.GetName().Version ?? new Version(0, 0));
         foreach (var warning in InstallWarnings)
         {
-            PostgresLog.Warn("[Instalación] " + warning);
+            PostgresLog.Warn("[Installation] " + warning);
         }
 
         // Log the active database engine so the plugin log always shows which mode Jellyfin is in
@@ -57,7 +57,7 @@ public class PostgresPlugin : BasePlugin<PluginConfiguration>, IHasWebPages
                     @"(?i)(Password\s*=)[^;]+",
                     "$1*****")
                 : "(unknown)";
-            PostgresLog.Info($"[ENGINE] Modo activo: PostgreSQL. Connection: {maskedConn}");
+            PostgresLog.Info($"[ENGINE] Active mode: PostgreSQL. Connection: {maskedConn}");
         }
         else
         {
@@ -65,7 +65,7 @@ public class PostgresPlugin : BasePlugin<PluginConfiguration>, IHasWebPages
             var sqliteSize = System.IO.File.Exists(sqlitePath)
                 ? $"{new System.IO.FileInfo(sqlitePath).Length / 1_048_576.0:F1} MB"
                 : "(no encontrado)";
-            PostgresLog.Info($"[ENGINE] Modo activo: SQLite. Archivo: {sqlitePath} ({sqliteSize})");
+            PostgresLog.Info($"[ENGINE] Active mode: SQLite. File: {sqlitePath} ({sqliteSize})");
         }
     }
 

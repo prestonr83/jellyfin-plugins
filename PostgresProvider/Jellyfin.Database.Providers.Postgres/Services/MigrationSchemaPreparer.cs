@@ -59,7 +59,7 @@ internal static class MigrationSchemaPreparer
             new PostgresDatabaseProvider(null, null),
             new NoLockBehavior(
                 NullLogger<NoLockBehavior>.Instance));
-        log("[Schema] Aplicando migraciones PostgreSQL para Jellyfin 12.4...");
+        log("[Schema] Applying PostgreSQL migrations for Jellyfin 12.4...");
         await context.Database.MigrateAsync(ct).ConfigureAwait(false);
     }
 
@@ -106,7 +106,7 @@ internal static class MigrationSchemaPreparer
             await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
         }
 
-        log("[Schema] Conversión de timestamps completada.");
+        log("[Schema] Timestamp conversion completed.");
     }
 
     // ── Sequence reset ────────────────────────────────────────────────────────
