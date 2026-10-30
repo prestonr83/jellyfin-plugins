@@ -1,0 +1,34 @@
+# Build outputs and downloaded tooling/source fixtures
+**/bin/
+**/obj/
+**/.tools/
+**/.work/
+**/.tmp/
+**/artifacts/
+/dist/
+**/__pycache__/
+*.py[cod]
+*.trx
+TestResults/
+.vs/
+.idea/
+.DS_Store
+Thumbs.db
+
+# This existing checkout has its own history and local modifications.
+/Jellyfin-Database-Providers-Postgres/
+
+# Machine-specific utilities are preserved locally but are not part of this catalog.
+/web-filter-fix/
+/emby_rating_sync.py
+
+# Local credentials and server configuration never belong in the source repository.
+.env
+.env.*
+!.env.example
+*.user
+*.suo
+*.pfx
+*.p12
+*.key
+nuget.local.config

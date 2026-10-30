@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head><title>Parental Guide</title></head>
+<body>
+<div id="ParentalGuideConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-button,emby-input,emby-checkbox">
+  <div data-role="content">
+    <div class="content-primary">
+      <form id="ParentalGuideConfigForm">
+        <h2>Parental Guide</h2>
+        <p>Processes movies and series. Preview changes in the server log before turning off dry run.</p>
+        <div class="inputContainer">
+          <label class="inputLabel" for="OmdbApiKey">OMDb API key</label>
+          <input is="emby-input" type="password" id="OmdbApiKey" required autocomplete="off" />
+        </div>
+        <div class="checkboxContainer checkboxContainer-withDescription">
+          <label><input is="emby-checkbox" type="checkbox" id="DryRun" /><span>Dry run</span></label>
+          <div class="fieldDescription checkboxFieldDescription">Preview only. No library metadata or item completion state is written. External API requests still count toward quota.</div>
+        </div>
+        <div class="checkboxContainer checkboxContainer-withDescription">
+          <label><input is="emby-checkbox" type="checkbox" id="ForceFullScanOnNextRun" /><span>Force full scan on next run</span></label>
+          <div class="fieldDescription checkboxFieldDescription">Ignore saved completion once, including during a dry run. Consumed when a valid run starts; the maximum-item limit still applies.</div>
+        </div>
+        <div class="inputContainer">
+          <label class="inputLabel" for="MaximumItems">Maximum items per run</label>
+          <input is="emby-input" type="number" id="MaximumItems" min="0" step="1" required />
+          <div class="fieldDescription">0 = unlimited. Counts attempted pending titles, including errors and dry runs.</div>
+        </div>
+        <div class="checkboxContainer"><label><input is="emby-checkbox" type="checkbox" id="TitleFallback" /><span>Match title/year when IMDb ID is absent or not found</span></label></div>
+        <div class="checkboxContainer"><label><input is="emby-checkbox" type="checkbox" id="AddLanguageTags" /><span>Add Lang:&lt;language&gt; tags from OMDb</span></label></div>
+        <div class="checkboxContainer checkboxContainer-withDescription">
+          <label><input is="emby-checkbox" type="checkbox" id="AddParentsGuideTags" /><span>Add all available IMDb Parents Guide category tags</span></label>
+          <div class="fieldDescription checkboxFieldDescription">Includes all five categories when supplied by IMDb, regardless of votes or certification. Existing tags are preserved.</div>
+        </div>
+        <div class="checkboxContainer checkboxContainer-withDescription">
+          <label><input is="emby-checkbox" type="checkbox" id="OnlyUpgradeRatings" /><span>Replace existing ratings only with stricter ratings</span></label>
+          <div class="fieldDescription checkboxFieldDescription">Uses a supported US movie/TV rating scale. Existing unknown or incomparable certifications are kept.</div>
+        </div>
+        <div class="checkboxContainer checkboxContainer-withDescription">
+          <label><input is="emby-checkbox" type="checkbox" id="InferFromParentsGuide" /><span>Infer a US rating when OMDb has no certification</span></label>
+          <div class="fieldDescription checkboxFieldDescription">Optional heuristic based on user-voted severities. A qualifying Severe category gives R/TV-MA; lower ratings require sufficient votes in all five categories.</div>
+        </div>
+        <div class="inputContainer">
+          <label class="inputLabel" for="ParentsGuideMinimumVotes">Minimum votes per category for inference</label>
+          <input is="emby-input" type="number" id="ParentsGuideMinimumVotes" min="1" step="1" required />
+        </div>
+        <h3>Requests and retries</h3>
+        <div class="inputContainer"><label class="inputLabel" for="RequestTimeoutSeconds">Request timeout (seconds)</label><input is="emby-input" type="number" id="RequestTimeoutSeconds" min="1" max="600" step="1" required /></div>
+        <div class="inputContainer"><label class="inputLabel" for="MaximumRetries">Maximum retries per request</label><input is="emby-input" type="number" id="MaximumRetries" min="0" max="10" step="1" required /></div>
+        <div class="inputContainer"><label class="inputLabel" for="RetryBaseDelaySeconds">Initial retry delay (seconds)</label><input is="emby-input" type="number" id="RetryBaseDelaySeconds" min="0.01" max="3600" step="any" required /></div>
+        <div class="inputContainer"><label class="inputLabel" for="RetryMaximumDelaySeconds">Maximum calculated retry delay (seconds)</label><input is="emby-input" type="number" id="RetryMaximumDelaySeconds" min="0.01" max="3600" step="any" required /><div class="fieldDescription">Exponential backoff includes jitter. A server's Retry-After may require a longer wait.</div></div>
+        <div class="inputContainer"><label class="inputLabel" for="OmdbDelaySeconds">Delay before each OMDb request (seconds)</label><input is="emby-input" type="number" id="OmdbDelaySeconds" min="0" max="3600" step="any" required /></div>
+        <div class="inputContainer"><label class="inputLabel" for="ImdbDelaySeconds">Delay before each IMDb request (seconds)</label><input is="emby-input" type="number" id="ImdbDelaySeconds" min="0" max="3600" step="any" required /></div>
+        <p>The native <strong>Parental Guide Metadata Sync</strong> task defaults to daily at 3:00 AM in the server's timezone. Change its triggers, start it, or cancel it from Dashboard &gt; Scheduled Tasks.</p>
+        <p>Completed live items are skipped on later runs. After changing enrichment settings, use Force full scan to revisit completed items.</p>
+        <button is="emby-button" type="submit" class="raised button-submit block"><span>Save</span></button>
+      </form>
+    </div>
+  </div>
+  <script type="text/javascript">
+    (function () {
+      'use strict';
+      var pluginId = '71c99661-e4e5-4d87-9901-3758313cb625';
+      var page = document.querySelector('#ParentalGuideConfigPage');
+      var checks = ['DryRun', 'ForceFullScanOnNextRun', 'TitleFallback', 'AddLanguageTags', 'AddParentsGuideTags', 'OnlyUpgradeRatings', 'InferFromParentsGuide'];
+      var numbers = ['MaximumItems', 'ParentsGuideMinimumVotes', 'RequestTimeoutSeconds', 'MaximumRetries', 'RetryBaseDelaySeconds', 'RetryMaximumDelaySeconds', 'OmdbDelaySeconds', 'ImdbDelaySeconds'];
+      page.addEventListener('viewshow', function () {
+        Dashboard.showLoadingMsg();
+        ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+          page.querySelector('#OmdbApiKey').value = config.OmdbApiKey || '';
+          checks.forEach(function (key) { page.querySelector('#' + key).checked = config[key]; });
+          numbers.forEach(function (key) { page.querySelector('#' + key).value = config[key]; });
+          Dashboard.hideLoadingMsg();
+        }).catch(function () {
+          Dashboard.hideLoadingMsg();
+          Dashboard.alert('Could not load Parental Guide settings.');
+        });
+      });
+      page.querySelector('#ParentalGuideConfigForm').addEventListener('submit', function (event) {
+        event.preventDefault();
+        var base = page.querySelector('#RetryBaseDelaySeconds');
+        var maximum = page.querySelector('#RetryMaximumDelaySeconds');
+        if (Number(maximum.value) < Number(base.value)) {
+          Dashboard.alert('Maximum retry delay must be at least the initial retry delay.');
+          return;
+        }
+        Dashboard.showLoadingMsg();
+        ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+          config.OmdbApiKey = page.querySelector('#OmdbApiKey').value.trim();
+          checks.forEach(function (key) { config[key] = page.querySelector('#' + key).checked; });
+          numbers.forEach(function (key) { config[key] = Number(page.querySelector('#' + key).value); });
+          return ApiClient.updatePluginConfiguration(pluginId, config);
+        }).then(function (result) {
+          Dashboard.processPluginConfigurationUpdateResult(result);
+        }).catch(function () {
+          Dashboard.hideLoadingMsg();
+          Dashboard.alert('Could not save Parental Guide settings.');
+        });
+      });
+    }());
+  </script>
+</div>
+</body>
+</html>

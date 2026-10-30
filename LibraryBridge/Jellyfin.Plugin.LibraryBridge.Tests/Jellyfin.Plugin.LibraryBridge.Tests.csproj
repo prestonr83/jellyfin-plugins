@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsTestProject>true</IsTestProject><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" PrivateAssets="all" />
+    <PackageReference Include="Jellyfin.Controller" Version="$(JellyfinVersion)" />
+    <ProjectReference Include="../Jellyfin.Plugin.LibraryBridge/Jellyfin.Plugin.LibraryBridge.csproj" />
+  </ItemGroup>
+  <!-- Optional contract tests compile the actual Jellyfin 12.4 query code, rather than imitating its SQL. -->
+  <PropertyGroup Condition="'$(JellyfinSourceRoot)' != ''">
+    <DefineConstants>$(DefineConstants);LIBRARYBRIDGE_NATIVE_TESTS</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(JellyfinSourceRoot)' != ''">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.14" />
+    <Compile Include="$(JellyfinSourceRoot)/Jellyfin.Server.Implementations/Item/*.cs" Exclude="$(JellyfinSourceRoot)/Jellyfin.Server.Implementations/Item/ItemPersistenceService.cs" Link="Native/%(Filename)%(Extension)" />
+    <Compile Include="$(JellyfinSourceRoot)/Jellyfin.Server.Implementations/Extensions/ExpressionExtensions.cs" Link="Native/ExpressionExtensions.cs" />
+  </ItemGroup>
+</Project>

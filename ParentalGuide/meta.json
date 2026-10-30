@@ -1,0 +1,12 @@
+{
+  "category": "Metadata",
+  "description": "Synchronize OMDb parental certifications, language tags, and IMDb Parents Guide metadata through a native scheduled task.",
+  "guid": "71c99661-e4e5-4d87-9901-3758313cb625",
+  "name": "Parental Guide",
+  "overview": "Parental certifications and Parents Guide tags with incremental, dry-run-safe synchronization.",
+  "owner": "prestonr83",
+  "autoUpdate": true,
+  "status": "Active",
+  "targetAbi": "12.0.0.0",
+  "version": "1.0.0.0"
+}

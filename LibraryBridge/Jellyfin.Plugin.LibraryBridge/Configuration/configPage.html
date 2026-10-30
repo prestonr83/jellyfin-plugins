@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html><head><title>Library Bridge</title></head><body>
+<div id="LibraryBridgePage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-textarea,emby-checkbox,emby-button">
+  <div data-role="content"><div class="content-primary"><form id="LibraryBridgeForm">
+    <h2>Library Bridge</h2>
+    <p>Show matching titles once in search, Next Up and Continue Watching, with Local and On Demand playback choices. Your libraries and media folders stay in place.</p>
+    <p id="bridgeState" role="status">Loading…</p>
+    <div class="inputContainer"><label class="inputLabel" for="bridgePairs">Library pairs (JSON)</label>
+      <textarea is="emby-textarea" id="bridgePairs" rows="16" spellcheck="false"></textarea>
+      <div class="fieldDescription">Use existing library names or IDs. ContentType is Series or Movie. A library may belong to one pair.</div></div>
+    <label class="checkboxContainer"><input is="emby-checkbox" type="checkbox" id="bridgeWatch"><span>Share watched status and resume progress</span></label>
+    <label class="checkboxContainer"><input is="emby-checkbox" type="checkbox" id="bridgeExisting"><span>Reconcile existing history (keep completed watches)</span></label>
+    <div class="inputContainer"><label class="inputLabel" for="bridgeRefresh">Refresh interval in minutes</label><input is="emby-input" type="number" min="1" max="1440" id="bridgeRefresh"></div>
+    <button is="emby-button" type="submit" class="raised button-submit block"><span>Save settings</span></button>
+    <button is="emby-button" type="button" id="bridgePreview" class="raised block"><span>Preview matches</span></button>
+    <button is="emby-button" type="button" id="bridgeApply" class="raised block"><span>Enable and apply</span></button>
+    <button is="emby-button" type="button" id="bridgeRestore" class="raised block"><span>Disable and restore original grouping</span></button>
+    <p>Preview does not change library items or watch history. Disabling restores grouping; synchronized watch history remains shared history.</p>
+    <pre id="bridgeReport" style="white-space:pre-wrap;overflow-wrap:anywhere" aria-live="polite"></pre>
+  </form></div></div>
+  <script>
+  (function () {
+    'use strict';
+    var pluginId = '1c550a63-a1f1-446a-8f69-b7fedc04c384';
+    var page = document.getElementById('LibraryBridgePage');
+    function el(id) { return page.querySelector('#' + id); }
+    function request(action) { return ApiClient.ajax({ type: action === 'Status' ? 'GET' : 'POST', url: ApiClient.getUrl('LibraryBridge/' + action), dataType: action === 'Restore' ? undefined : 'json' }); }
+    function report(value) { el('bridgeReport').textContent = JSON.stringify(value, null, 2); }
+    function error(err) { el('bridgeReport').textContent = err.responseJSON && err.responseJSON.detail || err.message || 'Operation failed. Check the Jellyfin log.'; }
+    function status() { return request('Status').then(function (value) { el('bridgeState').textContent = value.Enabled ? 'Enabled' : 'Disabled — preview available'; if (value.LastError) el('bridgeState').textContent += ': ' + value.LastError; }); }
+    function save() {
+      var pairs;
+      try { pairs = JSON.parse(el('bridgePairs').value); if (!Array.isArray(pairs) || !pairs.length) throw new Error('Enter at least one library pair.'); }
+      catch (err) { return Promise.reject(err); }
+      return ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+        config.LibraryPairs = pairs; config.SynchronizeWatchState = el('bridgeWatch').checked;
+        config.ReconcileExistingWatchState = el('bridgeExisting').checked;
+        config.RefreshMinutes = Math.max(1, Math.min(1440, Number(el('bridgeRefresh').value) || 15));
+        return ApiClient.updatePluginConfiguration(pluginId, config);
+      });
+    }
+    page.addEventListener('pageshow', function () {
+      ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+        el('bridgePairs').value = JSON.stringify(config.LibraryPairs, null, 2);
+        el('bridgeWatch').checked = config.SynchronizeWatchState;
+        el('bridgeExisting').checked = config.ReconcileExistingWatchState;
+        el('bridgeRefresh').value = config.RefreshMinutes;
+        return status();
+      }).catch(error);
+    });
+    el('LibraryBridgeForm').addEventListener('submit', function (event) { event.preventDefault(); save().then(function () { Dashboard.alert('Settings saved.'); }).catch(error); });
+    [['bridgePreview', 'Preview'], ['bridgeApply', 'Apply'], ['bridgeRestore', 'Restore']].forEach(function (pair) {
+      el(pair[0]).addEventListener('click', function () {
+        var buttons = page.querySelectorAll('button'); buttons.forEach(function (b) { b.disabled = true; }); Dashboard.showLoadingMsg();
+        var ready = pair[1] === 'Restore' ? Promise.resolve() : save();
+        ready.then(function () { return request(pair[1]); }).then(function (result) { report(result || { Restored: true }); return status(); })
+          .catch(error).finally(function () { Dashboard.hideLoadingMsg(); buttons.forEach(function (b) { b.disabled = false; }); });
+      });
+    });
+  })();
+  </script>
+</div></body></html>

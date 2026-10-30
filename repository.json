@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "githubRepository": "prestonr83/jellyfin-plugins",
+  "name": "Preston's Jellyfin Plugins",
+  "nativeTestSource": {
+    "repository": "jellyfin/jellyfin",
+    "commit": "83d0d0e7f76e23e2e085c8ff67d28b772d35967d",
+    "version": "12.4.0"
+  },
+  "plugins": [
+    {
+      "directory": "LibraryBridge",
+      "solution": "LibraryBridge.slnx",
+      "project": "Jellyfin.Plugin.LibraryBridge/Jellyfin.Plugin.LibraryBridge.csproj",
+      "assembly": "Jellyfin.Plugin.LibraryBridge.dll",
+      "jellyfinVersion": "12.4.0",
+      "nativeTests": true,
+      "archivePrefix": "LibraryBridge",
+      "changelog": "Adds Jellyfin repository installation and automatic updates. Includes cross-library search, Next Up and Continue Watching grouping, selectable local/on-demand sources, and shared watch progress."
+    },
+    {
+      "directory": "ParentalGuide",
+      "solution": "ParentalGuide.slnx",
+      "project": "Jellyfin.Plugin.ParentalGuide/Jellyfin.Plugin.ParentalGuide.csproj",
+      "assembly": "Jellyfin.Plugin.ParentalGuide.dll",
+      "jellyfinVersion": "12.0.0",
+      "nativeTests": false,
+      "archivePrefix": "ParentalGuide",
+      "changelog": "Initial catalog release: native scheduled synchronization of parental certifications and Parents Guide tags, with configurable dry runs and incremental state."
+    }
+  ]
+}

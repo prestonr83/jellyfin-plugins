@@ -1,0 +1,12 @@
+{
+  "guid": "1c550a63-a1f1-446a-8f69-b7fedc04c384",
+  "name": "Library Bridge",
+  "description": "Cross-library search, Next Up and Continue Watching grouping with local/on-demand playback choices and shared progress.",
+  "overview": "One title across local and on-demand libraries, with selectable sources and shared progress.",
+  "category": "General",
+  "version": "0.2.1.0",
+  "targetAbi": "12.4.0.0",
+  "status": "Active",
+  "autoUpdate": true,
+  "owner": "prestonr83"
+}

@@ -1,0 +1,58 @@
+name: Publish Jellyfin catalog
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to publish, for example v2026.10.30.1
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jellyfin-catalog-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: Validate release tag
+        shell: bash
+        run: |
+          python -c 'import os,re; assert re.fullmatch(r"v[0-9][A-Za-z0-9._-]*", os.environ["RELEASE_TAG"]), "Invalid release tag"'
+          git show-ref --verify "refs/tags/$RELEASE_TAG"
+      - name: Test packaging and catalog contracts
+        run: python -m unittest discover -s scripts/tests -v
+      - name: Read previous published catalog
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/release_repository.py previous
+      - name: Build and test every plugin, preserving immutable published versions
+        run: python scripts/build_repository.py --tag "$RELEASE_TAG" --previous-manifest .work/previous-manifest.json
+      - name: Validate release assets
+        run: python scripts/release_repository.py publish --tag "$RELEASE_TAG" --dry-run
+      - name: Publish complete catalog and downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/release_repository.py publish --tag "$RELEASE_TAG"
