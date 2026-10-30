@@ -82,6 +82,25 @@ def release_assets(repository: str, tag: str, output: Path) -> list[Path]:
     return sorted(assets)
 
 
+def find_release(repository: str, tag: str) -> dict | None:
+    release = github_json(f"repos/{repository}/releases/tags/{urllib.parse.quote(tag, safe='')}")
+    if release is not None:
+        return release
+    # The tag endpoint finds published releases. Authenticated listings also
+    # include drafts, which must be found before retrying an interrupted upload.
+    page = 1
+    while True:
+        releases = github_json(f"repos/{repository}/releases?per_page=100&page={page}")
+        if releases is None:
+            raise ValueError("Could not list repository releases, including drafts.")
+        match = next((release for release in releases if release["tag_name"] == tag), None)
+        if match is not None:
+            return match
+        if len(releases) < 100:
+            return None
+        page += 1
+
+
 def publish(repository: str, tag: str, output: Path, dry_run: bool) -> None:
     repository_name(repository)
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", tag):
@@ -93,15 +112,18 @@ def publish(repository: str, tag: str, output: Path, dry_run: bool) -> None:
     information = github_json(f"repos/{repository}")
     if information is None or information.get("private", True):
         raise ValueError("Jellyfin needs unauthenticated catalog downloads; publish from a public GitHub repository.")
-    existing = github_json(f"repos/{repository}/releases/tags/{urllib.parse.quote(tag, safe='')}")
+    existing = find_release(repository, tag)
     if existing and not existing["draft"]:
         raise ValueError("This release is already public. Published catalogs/assets are immutable; use a new tag.")
     def gh(*arguments: str) -> None:
         subprocess.run(["gh", "release", *arguments, "--repo", repository], cwd=ROOT, check=True)
     if not existing:
         gh("create", tag, "--verify-tag", "--draft", "--title", tag, "--notes-file", str(output / "release-notes.md"))
+        existing = find_release(repository, tag)
+    if existing is None or not existing["draft"]:
+        raise ValueError("Could not locate the draft release; no assets were uploaded or published.")
     gh("upload", tag, *map(str, assets), "--clobber")
-    uploaded = github_json(f"repos/{repository}/releases/tags/{urllib.parse.quote(tag, safe='')}")
+    uploaded = github_json(f"repos/{repository}/releases/{existing['id']}")
     if uploaded is None or not {path.name for path in assets}.issubset({asset["name"] for asset in uploaded["assets"]}):
         raise ValueError("Not all assets reached the draft release; it was not published.")
     # Publishing is last: Jellyfin keeps reading the previous complete catalog until this point.

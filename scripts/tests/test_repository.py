@@ -238,6 +238,82 @@ class RepositoryTests(unittest.TestCase):
                 release.publish("owner/plugins", "v1", self.output, False)
             command.assert_not_called()
 
+    def test_new_draft_is_verified_by_id_before_publication(self):
+        self.package()
+        draft = {"id": 42, "tag_name": "v1", "draft": True, "assets": []}
+        uploaded = dict(draft, assets=[{"name": path.name} for path in release.release_assets("owner/plugins", "v1", self.output)])
+        state = {"created": False, "uploaded": False}
+
+        def api(path):
+            if path == "repos/owner/plugins":
+                return {"private": False}
+            if path == "repos/owner/plugins/releases/tags/v1":
+                return None  # The published-release endpoint cannot see this draft.
+            if path == "repos/owner/plugins/releases?per_page=100&page=1":
+                return [draft] if state["created"] else []
+            if path == "repos/owner/plugins/releases/42":
+                self.assertTrue(state["uploaded"])
+                return uploaded
+            self.fail(f"Unexpected API request: {path}")
+
+        def gh(arguments, **kwargs):
+            if arguments[2] == "create":
+                state["created"] = True
+            elif arguments[2] == "upload":
+                state["uploaded"] = True
+
+        with mock.patch.object(release, "github_json", side_effect=api) as api_calls, \
+             mock.patch.object(release.subprocess, "run", side_effect=gh) as commands:
+            release.publish("owner/plugins", "v1", self.output, False)
+        self.assertEqual([call.args[0][2] for call in commands.call_args_list], ["create", "upload", "edit"])
+        api_calls.assert_any_call("repos/owner/plugins/releases/42")
+        self.assertIn("--draft=false", commands.call_args_list[-1].args[0])
+
+    def test_interrupted_draft_upload_is_resumed_without_creating_another_release(self):
+        self.package()
+        draft = {"id": 42, "tag_name": "v1", "draft": True, "assets": []}
+        uploaded = dict(draft, assets=[{"name": path.name} for path in release.release_assets("owner/plugins", "v1", self.output)])
+        with mock.patch.object(release, "find_release", return_value=draft), \
+             mock.patch.object(release, "github_json", side_effect=[{"private": False}, uploaded]), \
+             mock.patch.object(release.subprocess, "run") as commands:
+            release.publish("owner/plugins", "v1", self.output, False)
+        self.assertEqual([call.args[0][2] for call in commands.call_args_list], ["upload", "edit"])
+
+    def test_missing_draft_asset_prevents_publication(self):
+        self.package()
+        draft = {"id": 42, "tag_name": "v1", "draft": True, "assets": []}
+        with mock.patch.object(release, "find_release", return_value=draft), \
+             mock.patch.object(release, "github_json", side_effect=[{"private": False}, draft]), \
+             mock.patch.object(release.subprocess, "run") as commands:
+            with self.assertRaisesRegex(ValueError, "Not all assets"):
+                release.publish("owner/plugins", "v1", self.output, False)
+        self.assertEqual([call.args[0][2] for call in commands.call_args_list], ["upload"])
+
+    def test_public_release_is_never_overwritten(self):
+        self.package()
+        with mock.patch.object(release, "find_release", return_value={"draft": False}), \
+             mock.patch.object(release, "github_json", return_value={"private": False}), \
+             mock.patch.object(release.subprocess, "run") as commands:
+            with self.assertRaisesRegex(ValueError, "already public"):
+                release.publish("owner/plugins", "v1", self.output, False)
+        commands.assert_not_called()
+
+    def test_draft_lookup_checks_later_pages(self):
+        first_page = [{"tag_name": f"other-{number}"} for number in range(100)]
+        draft = {"id": 42, "tag_name": "v1", "draft": True}
+        with mock.patch.object(release, "github_json", side_effect=[None, first_page, [draft]]) as api:
+            self.assertEqual(release.find_release("owner/plugins", "v1"), draft)
+        api.assert_any_call("repos/owner/plugins/releases?per_page=100&page=2")
+
+    def test_unlocated_new_draft_prevents_upload_and_publication(self):
+        self.package()
+        with mock.patch.object(release, "find_release", return_value=None), \
+             mock.patch.object(release, "github_json", return_value={"private": False}), \
+             mock.patch.object(release.subprocess, "run") as commands:
+            with self.assertRaisesRegex(ValueError, "locate the draft"):
+                release.publish("owner/plugins", "v1", self.output, False)
+        self.assertEqual([call.args[0][2] for call in commands.call_args_list], ["create"])
+
     def test_archive_entry_directory_traversal_is_rejected_on_all_platforms(self):
         for name in ("../plugin.dll", "sub/plugin.dll", "sub\\plugin.dll"):
             with self.assertRaises(ValueError):
