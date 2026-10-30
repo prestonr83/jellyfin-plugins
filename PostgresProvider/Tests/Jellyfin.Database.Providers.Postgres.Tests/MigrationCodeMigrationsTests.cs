@@ -62,7 +62,7 @@ public sealed class MigrationCodeMigrationsTests
             Assert.Contains("20250420070000_MigrateActivityLogDb", applied.Keys, StringComparer.Ordinal);
             Assert.DoesNotContain("20240101000000_SqliteOnlyMigration", applied.Keys, StringComparer.Ordinal);
             Assert.Equal("9.0.0", applied["20250420080000_RemoveDuplicateExtras"]);
-            Assert.Contains(log, entry => entry.Contains("2 de 3", StringComparison.Ordinal));
+            Assert.Contains(log, entry => entry.Contains("2 of 3", StringComparison.Ordinal));
         }
         finally
         {

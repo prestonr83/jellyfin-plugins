@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from contextlib import chdir
 import hashlib
 import json
 from pathlib import Path
@@ -151,6 +152,38 @@ class RepositoryTests(unittest.TestCase):
         first = build.source_checksum(self.root, self.spec)
         source.write_bytes(b"class Plugin {\r\n}\r\n")
         self.assertEqual(first, build.source_checksum(self.root, self.spec))
+
+    def test_relative_repository_roots_preserve_source_identity(self):
+        (self.root / "Directory.Build.props").write_text("<Project />", encoding="utf-8")
+        expected = build.source_checksum(self.root.resolve(), self.spec)
+        with chdir(self.root.parent):
+            self.assertEqual(expected, build.source_checksum(Path(self.root.name), self.spec))
+
+    @unittest.skipUnless(sys.platform == "win32", "Windows short paths")
+    def test_windows_short_paths_preserve_source_identity_and_published_assets(self):
+        import ctypes
+
+        get_short_path = ctypes.WinDLL("kernel32", use_last_error=True).GetShortPathNameW
+        get_short_path.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint]
+        get_short_path.restype = ctypes.c_uint
+        buffer = ctypes.create_unicode_buffer(32768)
+        length = get_short_path(str(self.root), buffer, len(buffer))
+        if not length:
+            raise ctypes.WinError(ctypes.get_last_error())
+        self.assertLess(length, len(buffer))
+        short_root = Path(buffer.value)
+        long_root = self.root.resolve()
+        if short_root == long_root:
+            self.skipTest("The test directory has no short-path alias on this volume.")
+
+        (self.root / "Directory.Build.props").write_text("<Project />", encoding="utf-8")
+        previous, _ = build.create_catalog(long_root, self.config, "owner/plugins", "v1", self.output,
+                                            [], "2026-10-30T12:00:00Z")
+        catalog, summary = build.create_catalog(short_root, self.config, "owner/plugins", "v2", self.output,
+                                                previous, "2026-10-30T12:00:00Z")
+        self.assertEqual(build.source_checksum(long_root, self.spec), build.source_checksum(short_root, self.spec))
+        self.assertEqual(catalog, previous)
+        self.assertTrue(summary[0]["reused"])
 
     def test_changelog_newlines_are_preserved(self):
         catalog, _ = self.package()

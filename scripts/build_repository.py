@@ -93,6 +93,9 @@ def load_configuration(root: Path = ROOT) -> dict:
 
 
 def source_checksum(root: Path, plugin: dict) -> str:
+    # inside() resolves short Windows paths and symlinks; hash paths relative to
+    # that same canonical root so equivalent checkout paths have one identity.
+    root = root.resolve()
     directory = inside(root, plugin["directory"])
     project = inside(directory, plugin["project"])
     files = [directory / "meta.json"]
