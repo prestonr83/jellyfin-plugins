@@ -10,6 +10,7 @@ namespace Jellyfin.Database.Providers.Postgres.Tests;
 /// writes there too. Without it the cache kept serving UserData, ItemValues and BaseItems rows that had just
 /// been changed for as long as the entry lived.
 /// </summary>
+[Collection(ProcessWideQueryCacheCollection.Name)]
 public sealed class HomeQueryCacheInvalidationTests
 {
     [Theory]

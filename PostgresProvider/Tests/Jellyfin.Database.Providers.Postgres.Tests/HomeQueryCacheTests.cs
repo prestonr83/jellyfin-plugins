@@ -16,6 +16,7 @@ namespace Jellyfin.Database.Providers.Postgres.Tests;
 /// after an entry was stored, and any id list at all, because arrays serialised to the same key.
 /// Each test creates its own throw-away database, so a run cannot touch real data.
 /// </summary>
+[Collection(ProcessWideQueryCacheCollection.Name)]
 public sealed class HomeQueryCacheTests
 {
     private const string SkipReason = "POSTGRES_TEST_CONNECTION is not set; skipping PostgreSQL integration tests.";
