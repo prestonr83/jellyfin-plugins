@@ -1,0 +1,31 @@
+# Apply only after deployment/jellyfin is stopped and its pods have gone.
+# Recheck the current config-volume node before using this example.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: jellyfin-upgrade-files
+  namespace: jellyfin
+spec:
+  automountServiceAccountToken: false
+  restartPolicy: Never
+  nodeSelector:
+    kubernetes.io/hostname: k3s-server-02
+  containers:
+    - name: files
+      image: postgres:17-bookworm@sha256:3645570cccdfa447589da9f57dd740faa29b30938e861289a5574b6ca6b03826
+      command: [/bin/sh, -c, 'sleep 86400']
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 256Mi
+      securityContext:
+        allowPrivilegeEscalation: false
+      volumeMounts:
+        - name: config
+          mountPath: /config
+  volumes:
+    - name: config
+      persistentVolumeClaim:
+        claimName: jellyfin-config

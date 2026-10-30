@@ -1,0 +1,4 @@
+*
+!Tools/
+!Tools/install-pg17-client.sh
+!Dockerfile.jellyfin124

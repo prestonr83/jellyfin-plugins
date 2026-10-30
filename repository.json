@@ -27,6 +27,18 @@
       "nativeTests": false,
       "archivePrefix": "ParentalGuide",
       "changelog": "Initial catalog release: native scheduled synchronization of parental certifications and Parents Guide tags, with configurable dry runs and incremental state."
+    },
+    {
+      "directory": "PostgresProvider",
+      "solution": "Jellyfin.Database.Providers.Postgres.sln",
+      "project": "Jellyfin.Database.Providers.Postgres/Jellyfin.Database.Providers.Postgres.csproj",
+      "assembly": "Jellyfin.Database.Providers.Postgres.dll",
+      "runtimeAssemblies": ["Npgsql.dll", "Npgsql.EntityFrameworkCore.PostgreSQL.dll"],
+      "publish": true,
+      "jellyfinVersion": "12.4.0",
+      "nativeTests": false,
+      "archivePrefix": "PostgresProvider",
+      "changelog": "Catalog distribution of the modified Jellyfin 12.4 provider. Retains grouped-ID materialization, split item queries, rating-filter fixes, migration compatibility and existing database state. Adds automatic catalog updates and explicit Npgsql dependency packaging."
     }
   ]
 }

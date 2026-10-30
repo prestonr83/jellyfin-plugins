@@ -1,0 +1,59 @@
+# Build Folders
+bin/
+obj/
+
+# IA Assistant
+.claude/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.sln.iml
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# NuGet
+*.nupkg
+**/packages/*
+!**/packages/build/
+
+# Visual Studio cache/options
+*.aps
+*.cache
+*.dbmdl
+*.bak
+*.backup
+*.log
+*.vspscc
+*.vssscc
+
+# .NET Core
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Test results (artefactos de la suite de verificacion)
+Tests/TestResults/
+*.trx
+
+# Publish output
+publish/
+publish_out/
+release/
+*.publish.xml
+
+# Local secrets
+secrets.json
+.local.settings.json
+.env
+
+# Temp / scratch
+.tmp/
+cleanup*.sql
+diag.sql

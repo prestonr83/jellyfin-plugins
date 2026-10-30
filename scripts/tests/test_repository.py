@@ -93,6 +93,23 @@ class RepositoryTests(unittest.TestCase):
         self.assertEqual(catalog[0]["versions"][0]["checksum"], hashlib.md5(content, usedforsecurity=False).hexdigest())
         self.assertEqual(len(catalog[0]["versions"][0]["checksum"]), 32)
 
+    def test_provider_packages_only_explicit_runtime_dependencies(self):
+        self.spec["runtimeAssemblies"] = ["Npgsql.dll", "Npgsql.EntityFrameworkCore.PostgreSQL.dll"]
+        self.spec["publish"] = True
+        directory = self.root / "Example/artifacts/catalog-publish"
+        directory.mkdir(parents=True)
+        for name in ("Example.dll", *self.spec["runtimeAssemblies"], "Microsoft.EntityFrameworkCore.dll"):
+            (directory / name).write_bytes(b"fixture dependency")
+        _, summary = self.package()
+        with zipfile.ZipFile(self.output / summary[0]["file"]) as archive:
+            self.assertEqual(set(archive.namelist()), {"Example.dll", "Npgsql.dll", "Npgsql.EntityFrameworkCore.PostgreSQL.dll", "meta.json"})
+
+    def test_server_dependency_bundling_is_rejected(self):
+        self.spec["runtimeAssemblies"] = ["Jellyfin.Controller.dll"]
+        build.write_json(self.root / "repository.json", self.config)
+        with self.assertRaisesRegex(ValueError, "Server/framework"):
+            build.load_configuration(self.root)
+
     def test_zip_is_deterministic(self):
         _, summary = self.package()
         archive = self.output / summary[0]["file"]
@@ -127,6 +144,13 @@ class RepositoryTests(unittest.TestCase):
         (self.root / "Example/Tests/ExtraTests.cs").write_text("// new tests")
         _, summary = self.package(previous, "v2")
         self.assertTrue(summary[0]["reused"])
+
+    def test_git_text_line_endings_do_not_change_source_identity(self):
+        source = self.root / "Example/Plugin/Plugin.cs"
+        source.write_bytes(b"class Plugin {\n}\n")
+        first = build.source_checksum(self.root, self.spec)
+        source.write_bytes(b"class Plugin {\r\n}\r\n")
+        self.assertEqual(first, build.source_checksum(self.root, self.spec))
 
     def test_changelog_newlines_are_preserved(self):
         catalog, _ = self.package()

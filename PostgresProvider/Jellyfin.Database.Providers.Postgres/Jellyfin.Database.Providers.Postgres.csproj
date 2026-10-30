@@ -1,0 +1,64 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Jellyfin.Database.Providers.Postgres</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Nullable>enable</Nullable>
+    <AnalysisMode>AllEnabledByDefault</AnalysisMode>
+    <CodeAnalysisRuleSet>../jellyfin.ruleset</CodeAnalysisRuleSet>
+    <!-- Jellyfin and EF Core versions are shared with the test host in Directory.Build.props. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      ExcludeAssets="runtime" prevents Jellyfin assemblies from being bundled into
+      the plugin .dll — the server provides them at runtime via its own assembly loader.
+    -->
+    <PackageReference Include="Jellyfin.Database.Implementations" Version="$(JellyfinVersion)">
+      <ExcludeAssets Condition="'$(IncludeJellyfinRuntime)' != 'true'">runtime</ExcludeAssets>
+    </PackageReference>
+
+    <PackageReference Include="Jellyfin.Common" Version="$(JellyfinVersion)">
+      <ExcludeAssets Condition="'$(IncludeJellyfinRuntime)' != 'true'">runtime</ExcludeAssets>
+    </PackageReference>
+    <PackageReference Include="Jellyfin.Controller" Version="$(JellyfinVersion)">
+      <ExcludeAssets Condition="'$(IncludeJellyfinRuntime)' != 'true'">runtime</ExcludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- EF Core + Npgsql — runtime dependencies bundled with the plugin -->
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="$(EntityFrameworkCoreVersion)">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+
+    <!-- SQLite — export PG → SQLite in-process + EF Core for schema creation -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="$(EntityFrameworkCoreVersion)" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="$(EntityFrameworkCoreVersion)">
+      <ExcludeAssets Condition="'$(IncludeJellyfinRuntime)' != 'true'">runtime</ExcludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Code analysis (build-time only, never shipped with the plugin) -->
+    <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556" PrivateAssets="All" />
+    <PackageReference Include="SmartAnalyzers.MultithreadingAnalyzer" Version="1.1.31" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- ASP.NET Core types — part of the shared runtime, not bundled -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Embedded resources -->
+    <EmbeddedResource Include="Resources\schema.sql" />
+    <EmbeddedResource Include="Web\configurationPage.html" />
+  </ItemGroup>
+
+</Project>

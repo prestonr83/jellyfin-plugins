@@ -30,7 +30,7 @@ jobs:
           python-version: '3.12'
       - name: Test packaging and catalog contracts
         run: python -m unittest discover -s scripts/tests -v
-      - name: Build, test and package both plugins
+      - name: Build, test and package all three plugins
         env:
           CATALOG_TAG: ci-${{ github.sha }}
         shell: bash
@@ -46,3 +46,34 @@ jobs:
           path: dist/*
           if-no-files-found: error
           retention-days: 14
+
+  postgres-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-bookworm@sha256:3645570cccdfa447589da9f57dd740faa29b30938e861289a5574b6ca6b03826
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      POSTGRES_TEST_CONNECTION: Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: Test against disposable PostgreSQL 17
+        env:
+          CATALOG_TAG: ci-${{ github.sha }}
+        run: python scripts/build_repository.py --tag "$CATALOG_TAG"

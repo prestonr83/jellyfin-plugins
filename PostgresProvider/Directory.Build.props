@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <Version>3.2.0.6</Version>
+    <AssemblyVersion>3.2.0.6</AssemblyVersion>
+    <FileVersion>3.2.0.6</FileVersion>
+    <JellyfinVersion Condition="'$(JellyfinVersion)' == ''">12.4.0</JellyfinVersion>
+    <EntityFrameworkCoreVersion>10.0.14</EntityFrameworkCoreVersion>
+  </PropertyGroup>
+</Project>

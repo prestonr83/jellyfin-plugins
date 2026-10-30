@@ -6,6 +6,7 @@ Source, automated builds, and a Jellyfin installation/update catalog for Preston
 | --- | --- | --- | --- |
 | [Library Bridge](LibraryBridge/README.md) | 0.2.1.0 | 12.4.0 | One search, Next Up, and Continue Watching entry across local/on-demand libraries, with selectable sources and shared progress |
 | [Parental Guide](ParentalGuide/README.md) | 1.0.0.0 | 12.0.0 | Native scheduled parental-certification and Parents Guide metadata synchronization |
+| [PostgreSQL Database Provider](PostgresProvider/FORK.md) | 3.2.0.6 | 12.4.0 | Modified BORNIOS provider with the existing Jellyfin 12.4 compatibility and query-performance fixes |
 
 ## Install and update through Jellyfin
 
@@ -17,7 +18,7 @@ https://github.com/prestonr83/jellyfin-plugins/releases/latest/download/manifest
 
 1. Open **Dashboard → Plugins → Repositories → Add** in Jellyfin.
 2. Name it **Preston's Jellyfin Plugins** and paste the URL above.
-3. Open **Catalog**, select **Library Bridge** or **Parental Guide**, and install.
+3. Open **Catalog**, select the desired plugin, and install.
 4. Restart Jellyfin when requested, then open the plugin's configuration page.
 5. Leave automatic updates enabled. Jellyfin's **Update Plugins** scheduled task discovers compatible newer versions from this same URL. Restart after an update when requested.
 
@@ -25,7 +26,7 @@ Library Bridge starts disabled with a preview. Parental Guide starts in dry-run 
 
 The manifest and package downloads must be publicly readable; publish this as a **public GitHub repository**. The URL becomes live only after the first successful release workflow. A private Git repository or Actions build artifact alone cannot serve this unauthenticated catalog.
 
-An older manually installed Library Bridge package may have automatic updates disabled in its `meta.json`. Enable updates in Jellyfin's plugin controls, or install the newer catalog version once through the Catalog. No DLL copying is needed.
+Older manually installed Library Bridge or PostgreSQL-provider packages may have automatic updates disabled in their `meta.json`. Enable updates in Jellyfin's plugin controls, or install the newer catalog version once through the Catalog. No DLL copying is needed. See [the PostgreSQL fork notes](PostgresProvider/FORK.md) for its preserved identity and upstream catalog interaction.
 
 ## Push this prepared repository
 
@@ -35,7 +36,7 @@ This directory is a standalone Git repository. Its expected origin is:
 https://github.com/prestonr83/jellyfin-plugins.git
 ```
 
-Create an **empty public** repository named `jellyfin-plugins` on GitHub, without adding a README, license, or `.gitignore` there. The local repository already contains those files. Then:
+The **public** GitHub repository has been created at this origin. The local repository already contains its README, license, and ignore rules. To publish the prepared source and first catalog release:
 
 ```powershell
 Set-Location C:\Users\Gaming\Documents\ServerStuff\jellyfin
@@ -46,7 +47,7 @@ git push origin v2026.10.30.1
 
 If authentication is needed, run `gh auth login` in your own terminal or use your normal Git credential manager. No personal access token belongs in this repository or in Jellyfin.
 
-The tag starts **Publish Jellyfin catalog** in GitHub Actions. It builds and tests both plugins, creates ZIPs and the catalog, uploads everything to a draft release, and publishes that release only after all uploads are complete. The repository URL above then works in Jellyfin.
+The tag starts **Publish Jellyfin catalog** in GitHub Actions. It builds and tests all three plugins, including PostgreSQL integration tests against a disposable PostgreSQL 17 service, creates ZIPs and the catalog, uploads everything to a draft release, and publishes that release only after all uploads are complete. The repository URL above then works in Jellyfin.
 
 The catalog tag identifies a bundle release; each plugin keeps its own version. The example date is only a tag name, not a release schedule.
 
@@ -72,12 +73,12 @@ python scripts/build_repository.py --dotnet C:\path\to\dotnet.exe --jellyfin-sou
 
 Generated files go to ignored `dist/`:
 
-- Each new plugin ZIP contains only that plugin's DLL and `meta.json`, with automatic updates enabled.
+- Each new plugin ZIP contains that plugin's DLL and `meta.json`, with automatic updates enabled. The PostgreSQL provider additionally includes its two explicitly allowed Npgsql dependency DLLs; server/framework DLLs are excluded.
 - `manifest.json` contains compatible versions, immutable release download URLs, changelogs, and Jellyfin's required **MD5 of the ZIP**.
 - `.sha256` sidecars provide an additional SHA-256 checksum.
 - `release-summary.json` and `release-notes.md` describe the bundle.
 
-ZIP contents/order/timestamps are deterministic. CI runs on Linux and Windows; publishing uses Linux. Action dependencies and the native-test source are pinned to reviewed commit SHAs.
+ZIP contents/order/timestamps are deterministic. CI builds on Linux and Windows and runs a separate PostgreSQL 17 integration job; publishing uses Linux and requires those provider integration tests too. Local/Windows runs without `POSTGRES_TEST_CONNECTION` skip the tests that require a live disposable PostgreSQL service. Backup-client tests and the optional live-server schema/log probe remain explicit opt-ins. Action dependencies and the native-test source are pinned to reviewed commit SHAs.
 
 ## Release an update
 
@@ -102,6 +103,6 @@ Repository automation uses GitHub's built-in `GITHUB_TOKEN` with write access on
 
 ## Local-only content
 
-`Jellyfin-Database-Providers-Postgres/` remains a separate, ignored Git checkout with its existing history and local modifications. This catalog does not build, publish, or replace that database provider. The legacy `emby_rating_sync.py`, `web-filter-fix/`, downloaded SDKs, caches, server state, and generated artifacts are also excluded from this Git repository.
+`Jellyfin-Database-Providers-Postgres/` remains a separate, ignored Git checkout with its existing history and local modifications. Its current modified source was imported into the tracked `PostgresProvider/` directory for this catalog; make future catalog-provider edits there. The import is ordinary source, not a submodule pointing at an unpublished commit. Upstream licensing and attribution are preserved. The legacy `emby_rating_sync.py`, `web-filter-fix/`, downloaded SDKs, caches, server state, and generated artifacts are also excluded from this Git repository.
 
 Build/test success is separate from live-server validation. Catalog installation and real-client playback should be checked after publishing the first release.

@@ -1,0 +1,9 @@
+FROM ghcr.io/linuxserver/jellyfin:12.4ubu2604-ls57@sha256:3894d9eae88418d3cf9ac6349392d2c4dad818365a59565d19edc38098897044
+
+USER root
+COPY Tools/install-pg17-client.sh /usr/local/sbin/install-pg17-client
+RUN sh /usr/local/sbin/install-pg17-client
+
+# This directory also makes version selection explicit if other clients are
+# installed later. Plugin PgBinPath may be set to the same directory.
+ENV PATH="/usr/lib/postgresql/17/bin:${PATH}"

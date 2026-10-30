@@ -84,6 +84,11 @@ def load_configuration(root: Path = ROOT) -> dict:
             raise ValueError("Assembly must be a DLL filename, without a directory.")
         if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_.-]*", plugin["archivePrefix"]):
             raise ValueError("Archive prefix must be a simple filename prefix.")
+        for dependency in plugin.get("runtimeAssemblies", []):
+            if Path(dependency).name != dependency or "/" in dependency or "\\" in dependency or not dependency.endswith(".dll"):
+                raise ValueError("Runtime dependencies must be explicit DLL filenames.")
+            if dependency.startswith(("Jellyfin.", "MediaBrowser.", "Microsoft.", "System.")):
+                raise ValueError("Server/framework DLLs must not be shipped as plugin dependencies.")
     return config
 
 
@@ -99,9 +104,13 @@ def source_checksum(root: Path, plugin: dict) -> str:
                 files.append(parent / name)
     digest = hashlib.sha256()
     digest.update(plugin["jellyfinVersion"].encode("utf-8") + b"\0")
+    digest.update(json.dumps(plugin.get("runtimeAssemblies", []), sort_keys=True).encode("utf-8") + b"\0")
     for path in sorted(set(files), key=lambda item: item.relative_to(root).as_posix()):
         digest.update(path.relative_to(root).as_posix().encode("utf-8") + b"\0")
-        digest.update(path.read_bytes() + b"\0")
+        content = path.read_bytes()
+        if path.suffix.lower() in {".cs", ".csproj", ".props", ".targets", ".json", ".html", ".sql", ".xml", ".config", ".resx", ".txt", ".yaml", ".yml", ".svg"}:
+            content = content.replace(b"\r\n", b"\n")
+        digest.update(content + b"\0")
     return digest.hexdigest()
 
 
@@ -170,13 +179,17 @@ def create_catalog(root: Path, config: dict, repository: str, tag: str, output: 
             summary.append({"name": meta["name"], "version": meta["version"], "reused": True,
                             "sourceUrl": old["sourceUrl"]})
         else:
-            assembly = inside(directory, spec["project"]).parent / "bin" / "Release" / "net10.0" / spec["assembly"]
+            assembly_directory = (directory / "artifacts/catalog-publish") if spec.get("publish") else \
+                inside(directory, spec["project"]).parent / "bin" / "Release" / "net10.0"
+            assembly = assembly_directory / spec["assembly"]
             if not assembly.is_file():
                 raise ValueError(f"Build output is missing: {assembly}")
             filename = f"{spec['archivePrefix']}_{meta['version']}_jellyfin{spec['jellyfinVersion']}.zip"
             package = output / filename
-            deterministic_zip(package, {spec["assembly"]: assembly.read_bytes(),
-                "meta.json": (json.dumps(meta, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8")})
+            contents = {name: (assembly_directory / name).read_bytes()
+                        for name in [spec["assembly"], *spec.get("runtimeAssemblies", [])]}
+            contents["meta.json"] = (json.dumps(meta, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8")
+            deterministic_zip(package, contents)
             content = package.read_bytes()
             checksum = hashlib.md5(content, usedforsecurity=False).hexdigest()
             sha256 = hashlib.sha256(content).hexdigest()
@@ -246,6 +259,7 @@ def build_plugins(config: dict, dotnet: str, source: Path, packages: str | None,
         meta = read_json(directory / "meta.json")
         common = ["-m:1", "-nr:false", "-p:UseSharedCompilation=false", "-p:ContinuousIntegrationBuild=true",
                   "-p:IncludeSourceRevisionInInformationalVersion=false", f"-p:Version={meta['version']}",
+                  f"-p:AssemblyVersion={meta['version']}", f"-p:FileVersion={meta['version']}",
                   f"-p:JellyfinVersion={spec['jellyfinVersion']}"]
         if spec["nativeTests"]:
             common.append(f"-p:JellyfinSourceRoot={source}")
@@ -262,6 +276,9 @@ def build_plugins(config: dict, dotnet: str, source: Path, packages: str | None,
             raise ValueError(f"{meta['name']}: assets do not match its declared Jellyfin ABI; restore first.")
         run(["build", spec["solution"], "--configuration", "Release", "--no-restore", "--nologo"])
         run(["test", spec["solution"], "--configuration", "Release", "--no-build", "--no-restore", "--nologo"])
+        if spec.get("publish"):
+            run(["publish", spec["project"], "--configuration", "Release", "--no-restore", "--nologo",
+                 "-p:IncludeJellyfinRuntime=false", "--output", str(directory / "artifacts/catalog-publish")])
 
 
 def main() -> int:

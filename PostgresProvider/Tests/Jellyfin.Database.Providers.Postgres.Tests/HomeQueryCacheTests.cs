@@ -1,0 +1,313 @@
+using System.Globalization;
+using Jellyfin.Database.Implementations;
+using Jellyfin.Database.Implementations.Locking;
+using Jellyfin.Database.Providers.Postgres.Services;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Logging.Abstractions;
+using Npgsql;
+using Xunit;
+
+namespace Jellyfin.Database.Providers.Postgres.Tests;
+
+/// <summary>
+/// The read cache must never answer Jellyfin's own write path with rows that belong to another snapshot.
+/// These are the three ways it did: rows inserted by a transaction that was later rolled back, rows added
+/// after an entry was stored, and any id list at all, because arrays serialised to the same key.
+/// Each test creates its own throw-away database, so a run cannot touch real data.
+/// </summary>
+public sealed class HomeQueryCacheTests
+{
+    private const string SkipReason = "POSTGRES_TEST_CONNECTION is not set; skipping PostgreSQL integration tests.";
+
+    // The next-page prefetch is best effort and shares one slot across the process, so it can be dropped
+    // legitimately. Repeating the scenario keeps the assertion strict without depending on timing.
+    private const int PrefetchAttempts = 5;
+
+    /// <summary>
+    /// A batch that inserts an item value inside a transaction and reads it back used to leave that read in
+    /// the cache. When the batch was rolled back (for example because another statement failed), the next
+    /// caller — a library scan checking whether a value already exists — received rows that were never
+    /// committed. That is how channel items ended up being inserted twice.
+    /// </summary>
+    [SkippableFact]
+    public async Task ValueReadBackInsideARolledBackTransactionIsNeverServedFromCache()
+    {
+        Skip.IfNot(TestEnvironment.PostgresAvailable, SkipReason);
+        await using var scratch = await TestEnvironment.ScratchDatabaseScope.CreateAsync();
+
+        var interceptor = new HomeQueryCacheInterceptor();
+        await MigrateAsync(scratch.Database.ConnectionString);
+
+        var pending = Guid.NewGuid();
+        using (var writer = CreateContext(scratch.Database.ConnectionString, interceptor))
+        {
+            using var transaction = writer.Database.BeginTransaction();
+            await writer.Database.ExecuteSqlRawAsync(
+                string.Concat(
+                    """INSERT INTO "ItemValues" ("ItemValueId", "Type", "Value", "CleanValue") VALUES ('""",
+                    pending.ToString(),
+                    """', 2, 'Fantasma', 'fantasma');"""));
+
+            // Jellyfin does exactly this: it reads the value back to decide whether to insert it.
+            Assert.Equal(new[] { pending }, await ReadValueIdsAsync(writer, "Fantasma"));
+
+            transaction.Rollback();
+        }
+
+        using (var reader = CreateContext(scratch.Database.ConnectionString, interceptor))
+        {
+            Assert.Empty(await ReadValueIdsAsync(reader, "Fantasma"));
+        }
+
+        Assert.Equal(0, await ScalarAsync(scratch.Database.ConnectionString, """SELECT COUNT(*) FROM "ItemValues" WHERE "Value" = 'Fantasma';"""));
+    }
+
+    /// <summary>
+    /// An entry stored before a write must not survive it. Without this, a scan that adds a genre kept
+    /// answering "that genre does not exist yet" for the whole time to live and every item after it failed
+    /// with 23505 on the unique value index.
+    /// </summary>
+    [SkippableFact]
+    public async Task WritingToATableInvalidatesTheEntriesStoredForIt()
+    {
+        Skip.IfNot(TestEnvironment.PostgresAvailable, SkipReason);
+        await using var scratch = await TestEnvironment.ScratchDatabaseScope.CreateAsync();
+
+        var interceptor = new HomeQueryCacheInterceptor();
+        await MigrateAsync(scratch.Database.ConnectionString);
+
+        using (var reader = CreateContext(scratch.Database.ConnectionString, interceptor))
+        {
+            Assert.Empty(await ReadValueIdsAsync(reader, "Nueva"));
+        }
+
+        var stored = Guid.NewGuid();
+        using (var writer = CreateContext(scratch.Database.ConnectionString, interceptor))
+        {
+            await writer.Database.ExecuteSqlRawAsync(
+                string.Concat(
+                    """INSERT INTO "ItemValues" ("ItemValueId", "Type", "Value", "CleanValue") VALUES ('""",
+                    stored.ToString(),
+                    """', 2, 'Nueva', 'nueva');"""));
+        }
+
+        using (var reader = CreateContext(scratch.Database.ConnectionString, interceptor))
+        {
+            Assert.Equal(new[] { stored }, await ReadValueIdsAsync(reader, "Nueva"));
+        }
+    }
+
+    /// <summary>
+    /// Two different lists of ids have to be two different entries. Arrays were serialised with
+    /// <c>ToString()</c>, which returns the type name, so every list shared one key and the cache answered
+    /// with another list's rows — the wrong answer for the existence checks Jellyfin makes before writing.
+    /// </summary>
+    [SkippableFact]
+    public async Task TwoDifferentListParametersDoNotShareAnEntry()
+    {
+        Skip.IfNot(TestEnvironment.PostgresAvailable, SkipReason);
+        await using var scratch = await TestEnvironment.ScratchDatabaseScope.CreateAsync();
+
+        var interceptor = new HomeQueryCacheInterceptor();
+        await MigrateAsync(scratch.Database.ConnectionString);
+
+        var alfa = Guid.NewGuid();
+        var beta = Guid.NewGuid();
+        await ExecuteAsync(
+            scratch.Database.ConnectionString,
+            string.Concat(
+                """INSERT INTO "ItemValues" ("ItemValueId", "Type", "Value", "CleanValue") VALUES ('""",
+                alfa.ToString(),
+                """', 2, 'Alfa', 'alfa'), ('""",
+                beta.ToString(),
+                """', 2, 'Beta', 'beta');"""));
+
+        using (var reader = CreateContext(scratch.Database.ConnectionString, interceptor))
+        {
+            Assert.Equal(new[] { alfa }, await ReadValueIdsFromListAsync(reader, [alfa.ToString(), "Alfa"]));
+        }
+
+        using (var reader = CreateContext(scratch.Database.ConnectionString, interceptor))
+        {
+            Assert.Equal(new[] { beta }, await ReadValueIdsFromListAsync(reader, [beta.ToString(), "Beta"]));
+        }
+    }
+
+    /// <summary>
+    /// A deterministic 100-row BaseItems page must warm only its immediate successor. The request for the
+    /// second page is then served from memory, while that cache hit starts warming page three.
+    /// </summary>
+    [SkippableFact]
+    public async Task FullBaseItemsPagePrefetchesTheNextPage()
+    {
+        Skip.IfNot(TestEnvironment.PostgresAvailable, SkipReason);
+        await using var scratch = await TestEnvironment.ScratchDatabaseScope.CreateAsync();
+        HomeQueryCacheInterceptor.Purge();
+        await MigrateAsync(scratch.Database.ConnectionString);
+
+        await ExecuteAsync(
+            scratch.Database.ConnectionString,
+            """
+            INSERT INTO "BaseItems" ("Id", "Type", "IsMovie", "IsLocked", "IsSeries", "IsRepeat", "IsInMixedFolder", "IsFolder", "IsVirtualItem", "Name")
+            SELECT md5('home-prefetch-' || value::text)::uuid, 'Movie', false, false, false, false, false, false, false, 'Home prefetch ' || lpad(value::text, 3, '0')
+            FROM generate_series(0, 200) AS value;
+            """);
+
+        var interceptor = new HomeQueryCacheInterceptor();
+        using var context = CreateContext(scratch.Database.ConnectionString, interceptor);
+        const string Sql = "SELECT \"Id\" AS \"Value\" FROM \"BaseItems\" ORDER BY \"Name\" LIMIT @limit OFFSET @offset";
+
+        var prefetched = false;
+        for (var attempt = 0; attempt < PrefetchAttempts && !prefetched; attempt++)
+        {
+            HomeQueryCacheInterceptor.Purge();
+
+            var firstPage = await context.Database.SqlQueryRaw<Guid>(Sql, new NpgsqlParameter { ParameterName = "limit", Value = 100 }, new NpgsqlParameter { ParameterName = "offset", Value = 0 }).ToListAsync();
+            Assert.Equal(100, firstPage.Count);
+
+            // The prefetch gives up after its own budget, so poll a little longer than that.
+            for (var waited = 0; waited < 60 && HomeQueryCacheInterceptor.PrefetchCompletedCount == 0; waited++)
+            {
+                await Task.Delay(50);
+            }
+
+            prefetched = HomeQueryCacheInterceptor.PrefetchCompletedCount == 1;
+        }
+
+        Assert.True(
+            prefetched,
+            $"The next-page prefetch never completed in {PrefetchAttempts} attempts; it is skipped when the shared slot is busy.");
+
+        var secondPage = await context.Database.SqlQueryRaw<Guid>(Sql, new NpgsqlParameter { ParameterName = "limit", Value = 100 }, new NpgsqlParameter { ParameterName = "offset", Value = 100 }).ToListAsync();
+        Assert.Equal(100, secondPage.Count);
+        Assert.Equal(1, HomeQueryCacheInterceptor.PrefetchedPageHitCount);
+    }
+
+    /// <summary>
+    /// Media-table queries must retain Npgsql's native reader conversions. Jellyfin's built-in search
+    /// projects an integer expression into a float; Npgsql permits that conversion while DataTableReader
+    /// requires an exact CLR type and used to make EF Core's GetFloat fail.
+    /// </summary>
+    [SkippableFact]
+    public async Task CachedMediaTableQueryPreservesSingle()
+    {
+        Skip.IfNot(TestEnvironment.PostgresAvailable, SkipReason);
+        await using var scratch = await TestEnvironment.ScratchDatabaseScope.CreateAsync();
+        HomeQueryCacheInterceptor.Purge();
+        await MigrateAsync(scratch.Database.ConnectionString);
+
+        var itemId = Guid.NewGuid();
+        await ExecuteAsync(
+            scratch.Database.ConnectionString,
+            string.Concat(
+                "INSERT INTO \"ItemValues\" (\"ItemValueId\", \"Type\", \"Value\", \"CleanValue\") VALUES ('",
+                itemId.ToString(),
+                "', 2, 'SingleFlightProbe', 'singleflightprobe');"));
+
+        var interceptor = new HomeQueryCacheInterceptor();
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var callers = Enumerable.Range(0, 20).Select(async _ =>
+        {
+            await start.Task;
+            using var context = CreateContext(scratch.Database.ConnectionString, interceptor);
+            return await context.Database
+                    .SqlQueryRaw<float>("SELECT 1::integer AS \"Value\" FROM \"ItemValues\" LIMIT 1")
+                .SingleAsync();
+        });
+
+        start.SetResult();
+        var results = await Task.WhenAll(callers);
+
+        Assert.All(results, value => Assert.Equal(1f, value));
+        Assert.Equal(0, HomeQueryCacheInterceptor.InFlightCount);
+    }
+
+    /// <summary>
+    /// The plugin role owns its database, so enabling search optimizations must
+    /// install pg_trgm in a new database instead of only warning that it is absent.
+    /// </summary>
+    [SkippableFact]
+    public async Task SearchOptimizationsEnablePgTrgmForDatabaseOwner()
+    {
+        Skip.IfNot(TestEnvironment.PostgresAvailable, SkipReason);
+        await using var scratch = await TestEnvironment.ScratchDatabaseScope.CreateAsync();
+        await MigrateAsync(scratch.Database.ConnectionString);
+
+        await PostgresDatabaseProvider.RunOptimizationsAsync(
+            scratch.Database.ConnectionString,
+            enableSearch: true,
+            enableVacuum: false,
+            NullLogger.Instance,
+            CancellationToken.None);
+
+        await using var connection = new NpgsqlConnection(scratch.Database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "SELECT COUNT(*) FROM pg_extension WHERE extname = 'pg_trgm';",
+            connection);
+        var installed = Convert.ToInt64(await command.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
+
+        Assert.Equal(1, installed);
+    }
+
+    /// <summary>Reads the identifiers of the values of a kind, using the shape Jellyfin's checks use.</summary>
+    /// <param name="context">Context to query with.</param>
+    /// <param name="value">Value to look for.</param>
+    /// <returns>Identifiers found.</returns>
+    private static Task<List<Guid>> ReadValueIdsAsync(JellyfinDbContext context, string value)
+        => context.Database
+            .SqlQuery<Guid>($"""SELECT "ItemValueId" AS "Value" FROM "ItemValues" WHERE "Type" = 2 AND "Value" = {value}""")
+            .ToListAsync();
+
+    /// <summary>Reads the identifiers of the values whose id is in a list, which binds an array parameter.</summary>
+    /// <param name="context">Context to query with.</param>
+    /// <param name="values">List to bind.</param>
+    /// <returns>Identifiers found.</returns>
+    private static Task<List<Guid>> ReadValueIdsFromListAsync(JellyfinDbContext context, string[] values)
+        => context.Database
+            .SqlQuery<Guid>($"""SELECT "ItemValueId" AS "Value" FROM "ItemValues" WHERE "Type" = 2 AND "Value" IN (SELECT unnest({values}))""")
+            .ToListAsync();
+
+    private static async Task MigrateAsync(string connectionString)
+    {
+        using var context = TestEnvironment.CreateModelContext(connectionString);
+        await context.Database.MigrateAsync();
+    }
+
+    private static JellyfinDbContext CreateContext(string connectionString, params IInterceptor[] interceptors)
+    {
+        connectionString = new NpgsqlConnectionStringBuilder(connectionString)
+        {
+            PersistSecurityInfo = true,
+        }.ConnectionString;
+        var builder = new DbContextOptionsBuilder<JellyfinDbContext>()
+            .UseNpgsql(connectionString, pg => pg.MigrationsAssembly(typeof(PostgresDatabaseProvider).Assembly.FullName));
+        if (interceptors.Length > 0)
+        {
+            builder.AddInterceptors(interceptors);
+        }
+
+        return new JellyfinDbContext(
+            builder.Options,
+            NullLogger<JellyfinDbContext>.Instance,
+            new PostgresDatabaseProvider(null, null),
+            new NoLockBehavior(NullLogger<NoLockBehavior>.Instance));
+    }
+
+    private static async Task<long> ScalarAsync(string connectionString, string sql)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(sql, connection);
+        return Convert.ToInt64(await command.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
+    }
+
+    private static async Task ExecuteAsync(string connectionString, string sql)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(sql, connection);
+        await command.ExecuteNonQueryAsync();
+    }
+}
