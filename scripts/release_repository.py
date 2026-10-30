@@ -8,7 +8,6 @@ import json
 import os
 from pathlib import Path
 import re
-import subprocess
 import sys
 import urllib.error
 import urllib.parse
@@ -17,18 +16,25 @@ import urllib.request
 from build_repository import ROOT, read_json, repository_name, validate_catalog, write_json
 
 
-def github_json(path: str):
+def github_json(path: str, *, method: str = "GET", data: dict | bytes | None = None):
     headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
                "User-Agent": "jellyfin-plugin-catalog-release"}
     token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
     if token:
         headers["Authorization"] = "Bearer " + token
-    request = urllib.request.Request("https://api.github.com/" + path.lstrip("/"), headers=headers)
+    body = None
+    if data is not None:
+        body = data if isinstance(data, bytes) else json.dumps(data).encode("utf-8")
+        headers["Content-Type"] = "application/octet-stream" if isinstance(data, bytes) else "application/json"
+    url = path if path.startswith("https://uploads.github.com/") else "https://api.github.com/" + path.lstrip("/")
+    request = urllib.request.Request(url, headers=headers, method=method, data=body)
     try:
         with urllib.request.urlopen(request, timeout=60) as response:
+            if response.status == 204:
+                return None
             return json.load(response)
     except urllib.error.HTTPError as error:
-        if error.code == 404:
+        if error.code == 404 and method == "GET":
             return None
         raise
 
@@ -93,7 +99,9 @@ def find_release(repository: str, tag: str) -> dict | None:
         releases = github_json(f"repos/{repository}/releases?per_page=100&page={page}")
         if releases is None:
             raise ValueError("Could not list repository releases, including drafts.")
-        match = next((release for release in releases if release["tag_name"] == tag), None)
+        match = next((release for release in releases if release["tag_name"] == tag
+                      or (release.get("draft") and release.get("name") == tag
+                          and release["tag_name"].startswith("untagged-"))), None)
         if match is not None:
             return match
         if len(releases) < 100:
@@ -115,19 +123,31 @@ def publish(repository: str, tag: str, output: Path, dry_run: bool) -> None:
     existing = find_release(repository, tag)
     if existing and not existing["draft"]:
         raise ValueError("This release is already public. Published catalogs/assets are immutable; use a new tag.")
-    def gh(*arguments: str) -> None:
-        subprocess.run(["gh", "release", *arguments, "--repo", repository], cwd=ROOT, check=True)
     if not existing:
-        gh("create", tag, "--verify-tag", "--draft", "--title", tag, "--notes-file", str(output / "release-notes.md"))
-        existing = find_release(repository, tag)
-    if existing is None or not existing["draft"]:
-        raise ValueError("Could not locate the draft release; no assets were uploaded or published.")
-    gh("upload", tag, *map(str, assets), "--clobber")
+        if github_json(f"repos/{repository}/git/ref/tags/{urllib.parse.quote(tag, safe='')}") is None:
+            raise ValueError("Release tag does not exist; push the tag before publishing.")
+        existing = github_json(f"repos/{repository}/releases", method="POST", data={
+            "tag_name": tag, "name": tag, "draft": True,
+            "body": (output / "release-notes.md").read_text(encoding="utf-8"),
+        })
+    if existing is None or not existing.get("draft") or not isinstance(existing.get("id"), int):
+        raise ValueError("GitHub did not return a draft release ID; no assets were uploaded or published.")
+    release_path = f"repos/{repository}/releases/{existing['id']}"
+    expected_names = {path.name for path in assets}
+    # Reconcile only this draft's assets. Published releases never reach this path.
+    for asset in existing.get("assets", []):
+        if asset["name"] in expected_names:
+            github_json(f"repos/{repository}/releases/assets/{asset['id']}", method="DELETE")
+    for asset in assets:
+        github_json(f"https://uploads.github.com/{release_path}/assets?name={urllib.parse.quote(asset.name, safe='')}",
+                    method="POST", data=asset.read_bytes())
     uploaded = github_json(f"repos/{repository}/releases/{existing['id']}")
-    if uploaded is None or not {path.name for path in assets}.issubset({asset["name"] for asset in uploaded["assets"]}):
+    if uploaded is None or not uploaded.get("draft") or not expected_names.issubset({asset["name"] for asset in uploaded["assets"]}):
         raise ValueError("Not all assets reached the draft release; it was not published.")
     # Publishing is last: Jellyfin keeps reading the previous complete catalog until this point.
-    gh("edit", tag, "--draft=false", "--latest")
+    published = github_json(release_path, method="PATCH", data={"tag_name": tag, "draft": False, "make_latest": "true"})
+    if published is None or published.get("draft", True) or published.get("tag_name") != tag:
+        raise ValueError("GitHub did not confirm publication of the requested catalog release.")
     print(f"Published https://github.com/{repository}/releases/tag/{tag}")
 
 
@@ -153,6 +173,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except (ValueError, KeyError, OSError, subprocess.CalledProcessError) as error:
+    except (ValueError, KeyError, OSError) as error:
         print(f"Release stopped: {error}", file=sys.stderr)
         raise SystemExit(1)
