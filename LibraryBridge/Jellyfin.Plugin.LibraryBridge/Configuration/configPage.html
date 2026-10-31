@@ -1,22 +1,43 @@
 <!DOCTYPE html>
-<html><head><title>Library Bridge</title></head><body>
-<div id="LibraryBridgePage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-textarea,emby-checkbox,emby-button">
+<html lang="en"><head><title>Library Bridge</title></head><body>
+<div id="LibraryBridgePage" data-role="page" class="page type-interior pluginConfigurationPage">
+  <style>
+    #LibraryBridgePage .content-primary { box-sizing: border-box; width: 100%; max-width: 64rem; margin-inline: auto; padding: 1.5rem; }
+    #LibraryBridgePage form { width: 100%; max-width: none; min-width: 0; }
+    #LibraryBridgePage .inputLabel { display: block; margin-bottom: .5rem; }
+    #LibraryBridgePage .emby-input { width: 100%; box-sizing: border-box; }
+    #LibraryBridgePage .bridge-json { min-height: 24rem; padding: .875rem; font-family: ui-monospace, Consolas, monospace; font-size: .875rem; line-height: 1.5; resize: vertical; }
+    #LibraryBridgePage .bridge-checkbox { display: flex; align-items: flex-start; gap: .75rem; line-height: 1.5; cursor: pointer; }
+    #LibraryBridgePage .bridge-checkbox input { flex: 0 0 auto; width: 1.2rem; height: 1.2rem; margin: .15rem 0 0; accent-color: var(--jf-palette-primary-main, #00a4dc); }
+    #LibraryBridgePage .bridge-interval { max-width: 20rem; }
+    #LibraryBridgePage .bridge-actions { display: grid; gap: .75rem; }
+    #LibraryBridgePage .bridge-actions button { width: 100%; min-height: 2.75rem; margin: 0; justify-content: center; }
+    #LibraryBridgePage :is(input, textarea, button):focus-visible { outline: 2px solid var(--jf-palette-primary-main, #00a4dc) !important; outline-offset: 3px; }
+    #LibraryBridgePage #bridgeReport { box-sizing: border-box; max-width: 100%; max-height: 36rem; padding: 1rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--jf-palette-FilledInput-bg, rgba(128, 128, 128, .12)); border-radius: .25rem; }
+    #LibraryBridgePage #bridgeReport:empty { display: none; }
+    @media (max-width: 40rem) {
+      #LibraryBridgePage .content-primary { padding: 1rem; }
+      #LibraryBridgePage .bridge-interval { max-width: none; }
+    }
+  </style>
   <div data-role="content"><div class="content-primary"><form id="LibraryBridgeForm">
     <h2>Library Bridge</h2>
     <p>Show matching titles once in search, Next Up and Continue Watching, with Local and On Demand playback choices. Your libraries and media folders stay in place.</p>
     <p id="bridgeState" role="status">Loading…</p>
     <div class="inputContainer"><label class="inputLabel" for="bridgePairs">Library pairs (JSON)</label>
-      <textarea is="emby-textarea" id="bridgePairs" rows="16" spellcheck="false"></textarea>
-      <div class="fieldDescription">Use existing library names or IDs. ContentType is Series or Movie. A library may belong to one pair.</div></div>
-    <label class="checkboxContainer"><input is="emby-checkbox" type="checkbox" id="bridgeWatch"><span>Share watched status and resume progress</span></label>
-    <label class="checkboxContainer"><input is="emby-checkbox" type="checkbox" id="bridgeExisting"><span>Reconcile existing history (keep completed watches)</span></label>
-    <div class="inputContainer"><label class="inputLabel" for="bridgeRefresh">Refresh interval in minutes</label><input is="emby-input" type="number" min="1" max="1440" id="bridgeRefresh"></div>
-    <button is="emby-button" type="submit" class="raised button-submit block"><span>Save settings</span></button>
-    <button is="emby-button" type="button" id="bridgePreview" class="raised block"><span>Preview matches</span></button>
-    <button is="emby-button" type="button" id="bridgeApply" class="raised block"><span>Enable and apply</span></button>
-    <button is="emby-button" type="button" id="bridgeRestore" class="raised block"><span>Disable and restore original grouping</span></button>
+      <textarea class="emby-input bridge-json" id="bridgePairs" rows="22" wrap="off" spellcheck="false" aria-describedby="bridgePairsHelp"></textarea>
+      <div class="fieldDescription" id="bridgePairsHelp">Use existing library names or IDs. ContentType is Series or Movie. A library may belong to one pair.</div></div>
+    <div class="checkboxContainer"><label class="bridge-checkbox"><input type="checkbox" id="bridgeWatch"><span>Share watched status and resume progress</span></label></div>
+    <div class="checkboxContainer"><label class="bridge-checkbox"><input type="checkbox" id="bridgeExisting"><span>Reconcile existing history (keep completed watches)</span></label></div>
+    <div class="inputContainer bridge-interval"><label class="inputLabel" for="bridgeRefresh">Refresh interval in minutes</label><input class="emby-input" type="number" min="1" max="1440" id="bridgeRefresh"></div>
+    <div class="bridge-actions">
+      <button type="submit" class="emby-button raised button-submit block"><span>Save settings</span></button>
+      <button type="button" id="bridgePreview" class="emby-button raised block"><span>Preview matches</span></button>
+      <button type="button" id="bridgeApply" class="emby-button raised block"><span>Enable and apply</span></button>
+      <button type="button" id="bridgeRestore" class="emby-button raised block"><span>Disable and restore original grouping</span></button>
+    </div>
     <p>Preview does not change library items or watch history. Disabling restores grouping; synchronized watch history remains shared history.</p>
-    <pre id="bridgeReport" style="white-space:pre-wrap;overflow-wrap:anywhere" aria-live="polite"></pre>
+    <pre id="bridgeReport" aria-live="polite"></pre>
   </form></div></div>
   <script>
   (function () {

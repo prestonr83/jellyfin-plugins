@@ -16,7 +16,7 @@
       "jellyfinVersion": "12.4.0",
       "nativeTests": true,
       "archivePrefix": "LibraryBridge",
-      "changelog": "Fixes preview and apply returning zero matches for populated libraries. Uses Jellyfin's recursive library query to include all physical roots, movies, series, seasons and episodes. Adds warnings identifying empty libraries or unmatched provider IDs, plus catalog traversal regression tests. Retains the early-startup initialization fix."
+      "changelog": "Fixes the settings page layout in Jellyfin 12.4: full-width themed JSON editor, labels above fields, visible native checkboxes, consistent button spacing, keyboard focus indicators and responsive phone layout. Uses explicit Jellyfin CSS classes instead of relying on legacy custom-element initialization."
     },
     {
       "directory": "ParentalGuide",
