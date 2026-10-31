@@ -2,11 +2,11 @@
 
 Library Bridge groups matching titles across paired libraries in search, Next Up, and Continue Watching while retaining their existing library membership, IDs, media folders, files, and STRM URLs. It supplies selectable Local / On Demand sources through Jellyfin's playback API and synchronizes watched status and resume progress.
 
-Version **0.2.5.0** targets **Jellyfin 12.4.0 on .NET 10**, fixes Continue Watching deduplication for lightweight client requests, adds responsive settings controls and fixes recursive library discovery and early-startup initialization, includes Continue Watching deduplication, and supports catalog installation/automatic updates. It is disabled when first installed. It has local automated coverage, including nested catalog discovery, early persistence initialization and Jellyfin's actual search/grouping, Next Up, and resume-query code on a disposable SQLite database. Production installation, your PostgreSQL provider, and playback in your actual clients still require validation.
+Version **0.2.6.0** targets **Jellyfin 12.4.0 on .NET 10**, fixes Continue Watching deduplication for lightweight client requests, adds responsive settings controls and fixes recursive library discovery and early-startup initialization, includes Continue Watching deduplication, and supports catalog installation/automatic updates. It is disabled when first installed. It has local automated coverage, including nested catalog discovery, early persistence initialization and Jellyfin's actual search/grouping, Next Up, and resume-query code on a disposable SQLite database. Production installation, your PostgreSQL provider, and playback in your actual clients still require validation.
 
 ## Install and preview
 
-1. Follow the [repository installation steps](../README.md#install-and-update-through-jellyfin) to install **Library Bridge** from Jellyfin's Catalog. For a manual/offline build, `build.ps1` also creates `artifacts/LibraryBridge_0.2.5.0_jellyfin12.4.zip` containing the DLL and descriptor; extract those directly into `Library Bridge_0.2.5.0` inside the server's actual plugins directory.
+1. Follow the [repository installation steps](../README.md#install-and-update-through-jellyfin) to install **Library Bridge** from Jellyfin's Catalog. For a manual/offline build, `build.ps1` also creates `artifacts/LibraryBridge_0.2.6.0_jellyfin12.4.zip` containing the DLL and descriptor; extract those directly into `Library Bridge_0.2.6.0` inside the server's actual plugins directory.
 2. Restart Jellyfin when requested and open **Dashboard → Plugins → Library Bridge**.
 3. Adjust the library pairs to your exact names or IDs. Defaults are `Shows` ↔ `Shows On Demand` and `Movies` ↔ `Movies On Demand`.
 4. Choose **Preview matches**. Preview reads all physical roots of each configured library without changing any item or watch history. The report includes group IDs, member item IDs, counts, and conflicting identities that were skipped. Empty libraries and pairs with no matches produce warnings with title counts and matching requirements. No matching-name fallback is used. `Applied: false` is expected for a preview; **Enable and apply** activates grouping.
@@ -27,7 +27,7 @@ No deployment or production restart is performed by the build script.
 - User access is checked for the displayed item and every alternate source. No alternates are returned for an unauthenticated or userless request. API-key requests need an explicit `userId` query parameter to expose user-specific alternate sources.
 - Watched state, resume position, play count, and last-played time are copied only within that user's accessible copies. Audio/subtitle selections, favorites, and ratings stay specific to each item. Positions scale by duration when both durations are known; with an unknown STRM duration the reported position is used.
 - Existing-history reconciliation keeps any completed watch and otherwise uses the most recently played version. Future explicit mark-unwatched events propagate as unwatched. Initial reconciliation can be disabled separately from future synchronization.
-- Index refresh happens after startup, on catalog changes (debounced), and periodically. The default interval is 15 minutes; catalog changes are checked every 30 seconds. A native scheduled task allows a manual refresh or a preview when disabled.
+- Index refresh happens after startup, on catalog changes (debounced), and periodically. The default interval is 15 minutes; catalog changes are checked every 30 seconds. A native scheduled task allows a manual refresh or a preview when disabled. Catalog discovery reads IDs from each library's physical roots, then loads metadata in batches of at most 128 items without image or user-history joins.
 
 Client-specific cached lists need reloading after activation. External search providers that truncate their own candidates can omit matches before Jellyfin receives them. Continue Watching processes the user's filtered in-progress candidates rather than the entire catalog; a profile with an unusually large resume list can therefore cost more to load than Jellyfin's original limited page.
 
@@ -69,6 +69,8 @@ To additionally compile and exercise Jellyfin's **actual 12.4** item query and N
 ```
 
 These optional contract tests use a fresh in-memory SQLite database and never connect to the running server. They verify search and resume deduplication, result totals, pagination, per-library visibility, active-session exclusions, Next Up progression, and restoring separate results. Source files are linked at build time; they are not copied into or shipped with the plugin.
+
+When `POSTGRES_TEST_CONNECTION` points to a disposable PostgreSQL server with permission to create databases, native tests also create and remove isolated `librarybridge_test_*` databases. They verify bounded catalog discovery with large Unicode fields, PostgreSQL split queries, and the provider's buffered cache enabled and disabled. The release workflow runs these tests against its temporary PostgreSQL service; ordinary builds skip them when the variable is absent.
 
 ## Implementation
 

@@ -5,13 +5,14 @@ using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Entities;
+using MediaBrowser.Model.Querying;
 using Xunit;
 
 namespace Jellyfin.Plugin.LibraryBridge.Tests;
 
 public sealed class CatalogTests
 {
-    [Fact] public void MovieLibrariesReadNestedContentsThroughTheRecursiveLibraryManagerApi()
+    [Fact] public void MovieLibrariesReadNestedContentsAcrossTheirPhysicalRoots()
     {
         var local = Movie("/movies/Example/movie.mkv", "123");
         var demand = Movie("/demand/Example.strm", "123");
@@ -62,6 +63,31 @@ public sealed class CatalogTests
         Assert.Contains(plan.Warnings, message => message.Contains("Primary: 1") && message.Contains("Alternate: 1") && message.Contains("provider IDs"));
     }
 
+    [Fact] public void LargeLibrariesHydrateAllIdsInBoundedBatchesWithoutImageOrHistoryJoins()
+    {
+        var local = Enumerable.Range(1, 301).Select(number => Movie($"/movies/{number}.mkv", number.ToString())).ToArray();
+        var demand = Enumerable.Range(1, 301).Select(number => Movie($"/demand/{number}.strm", number.ToString())).ToArray();
+        var batches = new List<int>();
+
+        var plan = Create("Movie", local, demand, batches).Build(Configuration("Movie"), CancellationToken.None);
+
+        Assert.Equal(301, plan.Groups.Length);
+        Assert.Equal(602, plan.Assignments.Length);
+        Assert.Equal(602, batches.Sum());
+        Assert.All(batches, count => Assert.InRange(count, 1, 128));
+        Assert.Equal(6, batches.Count);
+        Assert.Empty(plan.Warnings);
+    }
+
+    [Fact] public void MissingPhysicalRootsNeverBecomeAnUnscopedWholeCatalogQuery()
+    {
+        var plan = Create("Movie", [Movie("/movies/example.mkv", "123")], [Movie("/demand/example.strm", "123")], missingPrimaryRoots: true)
+            .Build(Configuration("Movie"), CancellationToken.None);
+
+        Assert.Empty(plan.Groups);
+        Assert.Contains(plan.Warnings, message => message.Contains("Primary") && message.Contains("no scanned"));
+    }
+
     private static Movie Movie(string path, string tmdb) => new()
     {
         Id = Guid.NewGuid(), Name = "Example", Path = path,
@@ -82,10 +108,12 @@ public sealed class CatalogTests
         LibraryPairs = [new() { PrimaryLibrary = "Primary", AlternateLibrary = "Alternate", ContentType = kind }]
     };
 
-    private static Catalog Create(string kind, BaseItem[] local, BaseItem[] demand)
+    private static Catalog Create(string kind, BaseItem[] local, BaseItem[] demand, List<int>? batchSizes = null, bool missingPrimaryRoots = false)
     {
-        var primary = new CollectionFolder { Id = Guid.NewGuid(), Name = "Primary", Path = "/config/root/Primary" };
-        var alternate = new CollectionFolder { Id = Guid.NewGuid(), Name = "Alternate", Path = "/config/root/Alternate" };
+        var primary = new CollectionFolder { Id = Guid.NewGuid(), Name = "Primary", Path = "/config/root/Primary",
+            PhysicalFolderIds = missingPrimaryRoots ? [] : [Guid.NewGuid(), Guid.NewGuid()] };
+        var alternate = new CollectionFolder { Id = Guid.NewGuid(), Name = "Alternate", Path = "/config/root/Alternate",
+            PhysicalFolderIds = [Guid.NewGuid(), Guid.NewGuid()] };
         var folders = new List<VirtualFolderInfo>
         {
             new() { Name = primary.Name, ItemId = primary.Id.ToString("N") },
@@ -100,21 +128,31 @@ public sealed class CatalogTests
                 return id == primary.Id ? primary : id == alternate.Id ? alternate
                     : local.Concat(demand).SingleOrDefault(item => item.Id == id);
             }
-            // GetItemIds does not expand recursive collection folders in Jellyfin 12.4.
-            // Their actual items live below physical roots, not directly below these folders.
-            if (method.Name == "GetItemIds") return Array.Empty<Guid>();
-            if (method.Name == "GetItemList")
+            if (method.Name is "GetItemIds" or "GetItemList")
             {
                 var query = Assert.IsType<InternalItemsQuery>(args![0]);
-                Assert.True(query.Recursive);
+                Assert.Equal(Guid.Empty, query.ParentId);
+                Assert.NotEmpty(query.TopParentIds);
+                var fromPrimary = query.TopParentIds.SequenceEqual(primary.PhysicalFolderIds);
+                Assert.Equal(fromPrimary ? primary.PhysicalFolderIds : alternate.PhysicalFolderIds, query.TopParentIds);
+                var available = fromPrimary ? local : demand;
                 Assert.False(query.GroupByPresentationUniqueKey);
                 Assert.True(query.IncludeAlternateVersions);
                 Assert.False(query.IsVirtualItem);
                 Assert.Equal(new[] { SourceType.Library }, query.SourceTypes);
                 Assert.Equal(kind == "Movie" ? new[] { BaseItemKind.Movie }
                     : new[] { BaseItemKind.Series, BaseItemKind.Season, BaseItemKind.Episode }, query.IncludeItemTypes);
-                Assert.Contains(query.ParentId, new[] { primary.Id, alternate.Id });
-                return query.ParentId == primary.Id ? local : demand;
+                if (method.Name == "GetItemIds")
+                {
+                    Assert.True(query.Recursive);
+                    return available.Select(item => item.Id).ToArray();
+                }
+                Assert.InRange(query.ItemIds.Length, 1, 128);
+                Assert.True(query.DtoOptions.ContainsField(ItemFields.ProviderIds));
+                Assert.False(query.DtoOptions.EnableImages);
+                Assert.False(query.DtoOptions.EnableUserData);
+                batchSizes?.Add(query.ItemIds.Length);
+                return available.Where(item => query.ItemIds.Contains(item.Id)).ToArray();
             }
             throw new InvalidOperationException("Unexpected library call: " + method.Name);
         });

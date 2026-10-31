@@ -13,7 +13,13 @@
   </PropertyGroup>
   <ItemGroup Condition="'$(JellyfinSourceRoot)' != ''">
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.14" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
+    <PackageReference Include="Npgsql" Version="10.0.3" />
     <Compile Include="$(JellyfinSourceRoot)/Jellyfin.Server.Implementations/Item/*.cs" Exclude="$(JellyfinSourceRoot)/Jellyfin.Server.Implementations/Item/ItemPersistenceService.cs" Link="Native/%(Filename)%(Extension)" />
     <Compile Include="$(JellyfinSourceRoot)/Jellyfin.Server.Implementations/Extensions/ExpressionExtensions.cs" Link="Native/ExpressionExtensions.cs" />
+    <Compile Include="../../PostgresProvider/Jellyfin.Database.Providers.Postgres/Services/PostgresItemQuerySplittingInterceptor.cs" Link="Native/PostgresItemQuerySplittingInterceptor.cs" />
+    <Compile Include="../../PostgresProvider/Jellyfin.Database.Providers.Postgres/Services/HomeQueryCacheInterceptor.cs" Link="Native/HomeQueryCacheInterceptor.cs" />
+    <Compile Include="../../PostgresProvider/Jellyfin.Database.Providers.Postgres/Services/PostgresGroupedItemIdsInterceptor.cs" Link="Native/PostgresGroupedItemIdsInterceptor.cs" />
+    <Compile Include="../../PostgresProvider/Jellyfin.Database.Providers.Postgres/Logging/PostgresLog.cs" Link="Native/PostgresLog.cs" />
   </ItemGroup>
 </Project>

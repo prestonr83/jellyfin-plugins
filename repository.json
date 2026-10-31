@@ -16,7 +16,7 @@
       "jellyfinVersion": "12.4.0",
       "nativeTests": true,
       "archivePrefix": "LibraryBridge",
-      "changelog": "Fixes duplicate Continue Watching cards when clients omit provider IDs from their requested fields. Loads identity metadata for the internal duplicate check while preserving response fields, permissions, order and paging. Adds real Jellyfin query regression coverage with persisted provider IDs, signed matches, lightweight field lists and reidentified items. Includes the 0.2.4 settings layout fixes."
+      "changelog": "Bounds catalog metadata reads to 128 items per query instead of loading an entire on-demand library with image and watch-history joins. Uses native physical-root IDs for correctly scoped ID discovery, preserves provider identities and episode grouping, and safely handles empty physical roots. Adds real PostgreSQL coverage with large Unicode metadata and the provider's split-query/cache readers, alongside the Continue Watching and settings fixes."
     },
     {
       "directory": "ParentalGuide",

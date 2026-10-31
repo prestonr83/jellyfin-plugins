@@ -1,15 +1,18 @@
 using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.LibraryBridge.Configuration;
 using Jellyfin.Plugin.LibraryBridge.Core;
+using MediaBrowser.Controller.Dto;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Entities;
+using MediaBrowser.Model.Querying;
 
 namespace Jellyfin.Plugin.LibraryBridge;
 
 public sealed class Catalog(ILibraryManager library)
 {
+    private const int MetadataBatchSize = 128;
     public GroupingPlan Build(PluginConfiguration configuration, CancellationToken cancellationToken)
     {
         if (configuration.LibraryPairs is null || configuration.LibraryPairs.Length == 0)
@@ -50,34 +53,52 @@ public sealed class Catalog(ILibraryManager library)
             }
             int Read(Guid id, string label, int preference)
             {
-                var parent = library.GetItemById(id) ?? throw new InvalidOperationException("Library no longer exists.");
+                var parent = library.GetItemById(id) as CollectionFolder
+                    ?? throw new InvalidOperationException("Library no longer exists or is not a collection folder.");
+                var physicalRoots = parent.PhysicalFolderIds.Where(root => root != Guid.Empty).Distinct().ToArray();
+                if (physicalRoots.Length == 0) return 0;
                 var kinds = pair.ContentType == "Movie" ? new[] { BaseItemKind.Movie }
                     : new[] { BaseItemKind.Series, BaseItemKind.Season, BaseItemKind.Episode };
-                // GetItemIds does not translate a recursive collection-folder parent into
-                // its physical roots. GetItemList performs that native library expansion.
-                var items = library.GetItemList(new InternalItemsQuery
+                // Match Jellyfin's collection-folder expansion explicitly for the ID-only query.
+                // Hydrate bounded batches without image/user-data joins instead of buffering an
+                // entire on-demand library through the provider's full-metadata reader/cache.
+                var itemIds = library.GetItemIds(new InternalItemsQuery
                 {
-                    Parent = parent, Recursive = true, IncludeItemTypes = kinds,
+                    TopParentIds = physicalRoots, Recursive = true, IncludeItemTypes = kinds,
                     GroupByPresentationUniqueKey = false, IncludeAlternateVersions = true,
                     SourceTypes = [SourceType.Library], IsVirtualItem = false
                 });
                 var titleCount = 0;
-                foreach (var item in items)
+                foreach (var batch in itemIds.Distinct().Chunk(MetadataBatchSize))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (string.IsNullOrEmpty(item.Path)) continue;
-                    if (GroupingPersistence.Kind(item) == pair.ContentType) titleCount++;
-                    var eligible = item is not Video video || (!video.PrimaryVersionId.HasValue
-                        && video.LinkedAlternateVersions.Length == 0 && video.LocalAlternateVersions.Length == 0
-                        && video.OwnerId == Guid.Empty);
-                    sides.Add(new(item.Id, GroupingPersistence.Kind(item), item.Name, item.Path, id,
-                        string.IsNullOrWhiteSpace(label) ? (preference == 0 ? "Local" : "On Demand") : label.Trim(), preference,
-                        new Dictionary<string, string>(item.ProviderIds, StringComparer.OrdinalIgnoreCase),
-                        (item as IHasSeries)?.SeriesId ?? Guid.Empty,
-                        item is Episode episode ? episode.ParentIndexNumber : item.IndexNumber,
-                        item is Episode ep ? ep.IndexNumber : null,
-                        (item as Episode)?.IndexNumberEnd,
-                        (item as Series)?.DisplayOrder?.Trim() ?? "", eligible));
+                    var items = library.GetItemList(new InternalItemsQuery
+                    {
+                        ItemIds = batch, TopParentIds = physicalRoots, IncludeItemTypes = kinds,
+                        GroupByPresentationUniqueKey = false, IncludeAlternateVersions = true,
+                        SourceTypes = [SourceType.Library], IsVirtualItem = false,
+                        DtoOptions = new DtoOptions(false)
+                        {
+                            Fields = [ItemFields.ProviderIds], EnableImages = false, EnableUserData = false
+                        }
+                    });
+                    foreach (var item in items)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (string.IsNullOrEmpty(item.Path)) continue;
+                        if (GroupingPersistence.Kind(item) == pair.ContentType) titleCount++;
+                        var eligible = item is not Video video || (!video.PrimaryVersionId.HasValue
+                            && video.LinkedAlternateVersions.Length == 0 && video.LocalAlternateVersions.Length == 0
+                            && video.OwnerId == Guid.Empty);
+                        sides.Add(new(item.Id, GroupingPersistence.Kind(item), item.Name, item.Path, id,
+                            string.IsNullOrWhiteSpace(label) ? (preference == 0 ? "Local" : "On Demand") : label.Trim(), preference,
+                            new Dictionary<string, string>(item.ProviderIds, StringComparer.OrdinalIgnoreCase),
+                            (item as IHasSeries)?.SeriesId ?? Guid.Empty,
+                            item is Episode episode ? episode.ParentIndexNumber : item.IndexNumber,
+                            item is Episode ep ? ep.IndexNumber : null,
+                            (item as Episode)?.IndexNumberEnd,
+                            (item as Series)?.DisplayOrder?.Trim() ?? "", eligible));
+                    }
                 }
                 return titleCount;
             }
