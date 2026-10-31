@@ -4,7 +4,7 @@ Source, automated builds, and a Jellyfin installation/update catalog for Preston
 
 | Plugin | Current version | Minimum Jellyfin | Purpose |
 | --- | --- | --- | --- |
-| [Library Bridge](LibraryBridge/README.md) | 0.2.4.0 | 12.4.0 | One search, Next Up, and Continue Watching entry across local/on-demand libraries, with selectable sources and shared progress |
+| [Library Bridge](LibraryBridge/README.md) | 0.2.5.0 | 12.4.0 | One search, Next Up, and Continue Watching entry across local/on-demand libraries, with selectable sources and shared progress |
 | [Parental Guide](ParentalGuide/README.md) | 1.0.0.0 | 12.0.0 | Native scheduled parental-certification and Parents Guide metadata synchronization |
 | [PostgreSQL Database Provider](PostgresProvider/FORK.md) | 3.2.0.7 | 12.4.0 | Modified BORNIOS provider with the existing Jellyfin 12.4 compatibility and query-performance fixes |
 

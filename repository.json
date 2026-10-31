@@ -16,7 +16,7 @@
       "jellyfinVersion": "12.4.0",
       "nativeTests": true,
       "archivePrefix": "LibraryBridge",
-      "changelog": "Fixes the settings page layout in Jellyfin 12.4: full-width themed JSON editor, labels above fields, visible native checkboxes, consistent button spacing, keyboard focus indicators and responsive phone layout. Uses explicit Jellyfin CSS classes instead of relying on legacy custom-element initialization."
+      "changelog": "Fixes duplicate Continue Watching cards when clients omit provider IDs from their requested fields. Loads identity metadata for the internal duplicate check while preserving response fields, permissions, order and paging. Adds real Jellyfin query regression coverage with persisted provider IDs, signed matches, lightweight field lists and reidentified items. Includes the 0.2.4 settings layout fixes."
     },
     {
       "directory": "ParentalGuide",

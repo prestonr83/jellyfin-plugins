@@ -2,6 +2,7 @@ using System.Reflection;
 using Jellyfin.Data.Enums;
 using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Plugin.LibraryBridge.Core;
+using MediaBrowser.Controller.Dto;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Persistence;
 using MediaBrowser.Model.Dto;
@@ -41,8 +42,11 @@ public sealed class ResumeRepository(IItemRepository inner, BridgeIndex index, F
     {
         var snapshot = index.Current;
         // Clone every query field, including user policy, library boundaries, sorting and DTO options.
-        // Only the clone's scalar paging properties and exclusion array are changed.
+        // Expand paging/exclusions and load provider identities for signature validation.
+        // DTO options must also be cloned: the API still uses the original client's fields.
         var candidates = (InternalItemsQuery)CloneMethod.Invoke(filter, null)!;
+        candidates.DtoOptions = (DtoOptions)CloneMethod.Invoke(filter.DtoOptions, null)!;
+        candidates.DtoOptions.Fields = filter.DtoOptions.Fields.Append(ItemFields.ProviderIds).Distinct().ToArray();
         candidates.StartIndex = 0;
         candidates.Limit = null;
         candidates.EnableTotalRecordCount = false;

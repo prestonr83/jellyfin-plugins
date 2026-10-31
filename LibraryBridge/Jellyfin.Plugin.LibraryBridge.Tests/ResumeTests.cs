@@ -70,12 +70,21 @@ public sealed class ResumeTests
     {
         var graph = new Graph(); var query = graph.Query(); query.StartIndex = 5; query.Limit = 10;
         query.TopParentIds = [Guid.NewGuid()]; query.Tags = ["allowed"]; query.ExcludeTags = ["blocked"];
+        query.DtoOptions.Fields = [ItemFields.Overview]; query.DtoOptions.EnableImages = false;
+        query.DtoOptions.EnableUserData = false; query.DtoOptions.ImageTypeLimit = 1;
+        query.DtoOptions.AddCurrentProgram = false; query.DtoOptions.AddProgramRecordingInfo = true;
         graph.Repository.GetItems(query);
         Assert.NotSame(query, graph.Received); Assert.Same(query.User, graph.Received!.User);
         Assert.Equal(query.TopParentIds, graph.Received.TopParentIds); Assert.Equal(query.Tags, graph.Received.Tags);
         Assert.Equal(query.ExcludeTags, graph.Received.ExcludeTags); Assert.True(graph.Received.IsResumable);
         Assert.Null(graph.Received.Limit); Assert.Equal(0, graph.Received.StartIndex);
         Assert.Equal(5, query.StartIndex); Assert.Equal(10, query.Limit); Assert.True(query.EnableTotalRecordCount);
+        Assert.NotSame(query.DtoOptions, graph.Received.DtoOptions);
+        Assert.Equal(new[] { ItemFields.Overview }, query.DtoOptions.Fields);
+        Assert.Equal(new[] { ItemFields.Overview, ItemFields.ProviderIds }, graph.Received.DtoOptions.Fields);
+        Assert.False(graph.Received.DtoOptions.EnableImages); Assert.False(graph.Received.DtoOptions.EnableUserData);
+        Assert.Equal(1, graph.Received.DtoOptions.ImageTypeLimit);
+        Assert.False(graph.Received.DtoOptions.AddCurrentProgram); Assert.True(graph.Received.DtoOptions.AddProgramRecordingInfo);
     }
     [Fact] public void ActiveSessionExclusionCoversEveryCopyOfTheItem()
     {

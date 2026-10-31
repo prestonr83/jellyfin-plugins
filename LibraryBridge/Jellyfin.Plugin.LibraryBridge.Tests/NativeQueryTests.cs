@@ -10,6 +10,7 @@ using MediaBrowser.Controller.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Persistence;
 using MediaBrowser.Model.Configuration;
+using MediaBrowser.Model.Querying;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -117,13 +118,17 @@ public sealed class NativeQueryTests : IDisposable
         var local = Add(db, BaseItemKind.Movie, _local, "Resumed A", "resume-a"); local.Path = "/local/a.mkv";
         var demand = Add(db, BaseItemKind.Movie, _demand, "Resumed A", "resume-a"); demand.Path = "/demand/a.strm";
         var other = Add(db, BaseItemKind.Movie, _local, "Resumed B", "resume-b"); other.Path = "/local/b.mkv";
+        foreach (var item in new[] { local, demand })
+            item.Provider = [new BaseItemProvider { Item = item, ItemId = item.Id, ProviderId = "Tmdb", ProviderValue = "945961" }];
         foreach (var item in new[] { local, demand, other })
             db.UserData.Add(new UserData { ItemId = item.Id, UserId = _user.Id, Item = null!, User = null!,
                 CustomDataKey = item.Id.ToString("N"), PlaybackPositionTicks = 1000, LastPlayedDate = DateTime.UtcNow });
         db.SaveChanges();
+        string Signature(BaseItemEntity entity) => PlanBuilder.Signature(new CatalogItem(entity.Id, "Movie", entity.Name!, entity.Path!,
+            entity.TopParentId!.Value, "", 0, _repository.RetrieveItem(entity.Id)!.ProviderIds));
         var index = new BridgeIndex(); index.Publish(new([
-            new(local.Id, local.Path, "Movie", "resume-a", null, "Local", 0),
-            new(demand.Id, demand.Path, "Movie", "resume-a", null, "On Demand", 1)],
+            new(local.Id, local.Path, "Movie", "resume-a", null, "Local", 0, Signature(local)),
+            new(demand.Id, demand.Path, "Movie", "resume-a", null, "On Demand", 1, Signature(demand))],
             [new("resume-a", "Movie", "Resumed A", [local.Id, demand.Id])], []));
         return (index, local.Id, demand.Id, other.Id);
     }
@@ -149,6 +154,48 @@ public sealed class NativeQueryTests : IDisposable
         var data = SeedResumes(); var query = Query(BaseItemKind.Movie); query.IsResumable = true; query.ExcludeItemIds = [data.Local];
         var bridge = new ResumeRepository(_repository, data.Index, () => true);
         Assert.Equal(data.Other, Assert.Single(bridge.GetItems(query).Items).Id);
+    }
+    [Fact] public void ResumeEndpointWithoutRequestedProviderIdsStillCollapsesVerifiedCopies()
+    {
+        var data = SeedResumes(); var query = Query(BaseItemKind.Movie); query.IsResumable = true;
+        // ItemsController replaces the default all-fields option with the fields requested by the client.
+        query.DtoOptions.Fields = [];
+        var ordinary = _repository.GetItemList(query);
+        Assert.Equal(3, ordinary.Count);
+        Assert.All(ordinary, item => Assert.Empty(item.ProviderIds));
+        var bridge = new ResumeRepository(_repository, data.Index, () => true);
+
+        var result = bridge.GetItems(query);
+
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal(2, result.TotalRecordCount);
+        Assert.Empty(query.DtoOptions.Fields);
+    }
+    [Fact] public void LightweightResumeListsAndIdPagesUseLogicalOffsets()
+    {
+        var data = SeedResumes(); var query = Query(BaseItemKind.Movie); query.IsResumable = true;
+        query.DtoOptions.Fields = []; query.Limit = 1;
+        var bridge = new ResumeRepository(_repository, data.Index, () => true);
+        var first = Assert.Single(bridge.GetItemIdsList(query));
+        query.StartIndex = 1;
+        var second = Assert.Single(bridge.GetItemList(query));
+
+        Assert.NotEqual(first, second.Id);
+        query.StartIndex = 2;
+        Assert.Empty(bridge.GetItemIdsList(query));
+    }
+    [Fact] public void LightweightResumeQueryDoesNotHideAReidentifiedCopy()
+    {
+        var data = SeedResumes();
+        using (var db = Context())
+        {
+            db.BaseItems.Include(item => item.Provider).Single(item => item.Id == data.Demand).Provider!.Single().ProviderValue = "123";
+            db.SaveChanges();
+        }
+        var query = Query(BaseItemKind.Movie); query.IsResumable = true; query.DtoOptions.Fields = [];
+        var bridge = new ResumeRepository(_repository, data.Index, () => true);
+
+        Assert.Equal(3, bridge.GetItems(query).TotalRecordCount);
     }
     public void Dispose() => _connection.Dispose();
 }
