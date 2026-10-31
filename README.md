@@ -22,6 +22,8 @@ https://github.com/prestonr83/jellyfin-plugins/releases/latest/download/manifest
 4. Restart Jellyfin when requested, then open the plugin's configuration page.
 5. Leave automatic updates enabled. Jellyfin's **Update Plugins** scheduled task discovers compatible newer versions from this same URL. Restart after an update when requested.
 
+**PostgreSQL provider updates require a full Jellyfin container/process restart on Jellyfin 12.4.** Its Dashboard restart runs the server again inside the existing process, which can retain the old database-provider assembly and fail with `Assembly with same name is already loaded`. For this Kubernetes deployment, use `kubectl rollout restart deployment/jellyfin -n jellyfin` after the update is installed. Catalog installation and updates still handle the DLLs automatically.
+
 Library Bridge starts disabled with a preview. Parental Guide starts in dry-run mode. Installing/updating the DLL does not turn these operational controls on.
 
 The manifest and package downloads must be publicly readable; publish this as a **public GitHub repository**. The URL becomes live only after the first successful release workflow. A private Git repository or Actions build artifact alone cannot serve this unauthenticated catalog.

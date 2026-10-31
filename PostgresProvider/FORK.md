@@ -21,6 +21,8 @@ Use the [parent catalog](../README.md#install-and-update-through-jellyfin), sele
 - `Npgsql.EntityFrameworkCore.PostgreSQL.dll`
 - `meta.json`
 
+On Jellyfin 12.4, complete provider updates with a **full container/process restart**. The Dashboard's internal restart can retain the previous provider assembly in the same .NET process and fail with `Assembly with same name is already loaded`. Restarting the container clears those assemblies; database files, media, configuration, and watch history remain in place. In the current Kubernetes deployment, run `kubectl rollout restart deployment/jellyfin -n jellyfin`.
+
 The plugin GUID and assembly identity remain compatible with the existing installation and configuration. Because this retains the upstream plugin GUID, another enabled catalog can also offer updates for that same plugin. Use this catalog for the modified provider, and deliberately choose whether to retain a competing upstream provider catalog. An older local package may have automatic updates disabled; enable them in Jellyfin or install this newer version once through the Catalog.
 
 Packaging through this repository changes distribution/version metadata and enables catalog updates; it does not activate PostgreSQL, change connection credentials, switch database engines, or run migrations against your live server. Existing PostgreSQL installations still need their existing database connection and client tools. See [the imported 12.4 notes](docs/JELLYFIN-12.4.md) for the runtime compatibility changes; historical package/version/update instructions there describe the prior local build.

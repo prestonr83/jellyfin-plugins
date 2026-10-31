@@ -1,5 +1,6 @@
 > **Catalog provider 3.2.0.7 for Jellyfin 12.4.x.** This fork includes the local compatibility and performance fixes, automatic catalog updates, and an English dashboard, server messages, and documentation. See [fork provenance and packaging](FORK.md).
 > Install through [Preston's Jellyfin plugin catalog](../README.md#install-and-update-through-jellyfin). The catalog URL becomes available after the first GitHub release is published.
+> After updating this provider on Jellyfin 12.4, restart the **whole Jellyfin container/process**. The Dashboard's internal restart can retain the old provider assembly and prevent startup. See [the update instructions](FORK.md#install-and-update).
 
 <div align="center">
 
