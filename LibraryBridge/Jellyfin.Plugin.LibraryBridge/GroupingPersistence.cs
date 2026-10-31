@@ -2,6 +2,7 @@ using Jellyfin.Plugin.LibraryBridge.Core;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
+using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Persistence;
 
 namespace Jellyfin.Plugin.LibraryBridge;
@@ -17,6 +18,28 @@ public sealed class GroupingPersistence(IItemPersistenceService inner, BridgeInd
         return new Suspension();
     }
     private sealed class Suspension : IDisposable { public void Dispose() => Suppression.Value--; }
+
+    /// <summary>Persist only grouping keys that differ; reapplying an existing plan is a read-only operation.</summary>
+    public static void SavePlan(IItemPersistenceService persistence, ILibraryManager library, GroupingPlan plan, CancellationToken cancellationToken)
+    {
+        var pending = new List<BaseItem>();
+        foreach (var assignment in plan.Assignments)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var item = library.GetItemById(assignment.Id);
+            if (item is null || !Matches(item, assignment)) continue;
+            if ((assignment.PresentationKey is not null && item.PresentationUniqueKey != assignment.PresentationKey)
+                || (assignment.SeriesKey is not null && (item as IHasSeries)?.SeriesPresentationUniqueKey != assignment.SeriesKey))
+                pending.Add(item);
+        }
+        // Capture every original before any batch is changed, as on the initial apply.
+        if (persistence is GroupingPersistence grouping) grouping.Prepare(pending, cancellationToken);
+        foreach (var batch in pending.Chunk(100))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            persistence.SaveItems(batch, cancellationToken);
+        }
+    }
 
     public void Prepare(IEnumerable<BaseItem> items, CancellationToken cancellationToken)
     {

@@ -16,7 +16,7 @@
       "jellyfinVersion": "12.4.0",
       "nativeTests": true,
       "archivePrefix": "LibraryBridge",
-      "changelog": "Bounds catalog metadata reads to 128 items per query instead of loading an entire on-demand library with image and watch-history joins. Uses native physical-root IDs for correctly scoped ID discovery, preserves provider identities and episode grouping, and safely handles empty physical roots. Adds real PostgreSQL coverage with large Unicode metadata and the provider's split-query/cache readers, alongside the Continue Watching and settings fixes."
+      "changelog": "Avoids rewriting unchanged item metadata when rebuilding already-applied grouping. Keeps recovery capture ahead of actual grouping changes, and replaces private runtime cloning of Continue Watching queries with copies through public query/DTO properties. Adds repeat-apply and concurrent-query regressions. Includes bounded metadata reads, PostgreSQL Unicode/cache tests, Continue Watching deduplication and the settings layout fixes."
     },
     {
       "directory": "ParentalGuide",

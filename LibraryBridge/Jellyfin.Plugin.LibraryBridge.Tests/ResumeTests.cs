@@ -61,6 +61,19 @@ public sealed class ResumeTests
         var result = graph.Repository.GetItems(graph.Query());
         Assert.Same(graph.Alternate, result.Items[0]);
     }
+    [Fact] public void ConcurrentResumeRequestsDoNotMutateTheSharedQueryOrItsDtoOptions()
+    {
+        var graph = new Graph(); var query = graph.Query();
+        query.StartIndex = 1; query.Limit = 1; query.DtoOptions.Fields = [ItemFields.Overview];
+        Parallel.For(0, 200, _ =>
+        {
+            var result = graph.Repository.GetItems(query);
+            Assert.Equal(graph.B.Id, Assert.Single(result.Items).Id);
+            Assert.Equal(3, result.TotalRecordCount);
+        });
+        Assert.Equal(1, query.StartIndex); Assert.Equal(1, query.Limit);
+        Assert.Equal(new[] { ItemFields.Overview }, query.DtoOptions.Fields);
+    }
     [Fact] public void ACopyWithoutProgressIsNotAddedToTheResumeList()
     {
         var graph = new Graph(); graph.Candidates = [graph.Alternate];

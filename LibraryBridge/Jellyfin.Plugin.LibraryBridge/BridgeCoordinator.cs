@@ -45,14 +45,7 @@ public sealed class BridgeCoordinator(Catalog catalog, BridgeIndex index, Recove
             if (!plugin.Configuration.Enabled) return LastReport = Report(plan, false);
             index.Publish(plan);
             RestoreEntries(plan.Assignments.Select(a => a.Id).ToHashSet(), cancellationToken);
-            if (persistence is GroupingPersistence grouping)
-                grouping.Prepare(plan.Assignments.Select(a => library.GetItemById(a.Id)).OfType<BaseItem>(), cancellationToken);
-            foreach (var batch in plan.Assignments.Chunk(100))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var items = batch.Select(a => library.GetItemById(a.Id)).OfType<BaseItem>().ToArray();
-                persistence.SaveItems(items, cancellationToken);
-            }
+            GroupingPersistence.SavePlan(persistence, library, plan, cancellationToken);
             if (plugin.Configuration.SynchronizeWatchState && plugin.Configuration.ReconcileExistingWatchState)
                 watch.Reconcile(plan, cancellationToken);
             LastError = null;

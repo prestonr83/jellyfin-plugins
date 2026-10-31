@@ -2,6 +2,7 @@ using Jellyfin.Plugin.LibraryBridge.Core;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
+using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Persistence;
 using Xunit;
 
@@ -17,6 +18,26 @@ public sealed class RecoveryTests : IDisposable
     private static BridgeIndex Index(params KeyAssignment[] assignments)
     {
         var index = new BridgeIndex(); index.Publish(new(assignments, [], [])); return index;
+    }
+    [Fact] public void ReapplyingAnExistingPlanDoesNotRewriteMetadataOrItsRecoveryJournal()
+    {
+        var item = Movie(); var assignment = Assignment(item);
+        var plan = new GroupingPlan([assignment], [], []);
+        var journal = new RecoveryJournal(JournalPath);
+        var index = Index(assignment);
+        var library = StubProxy.Create<ILibraryManager>((method, _) => method.Name == "GetItemById" ? item : null);
+        var firstNative = new MemoryPersistence();
+        GroupingPersistence.SavePlan(new GroupingPersistence(firstNative, index, journal, () => true), library, plan, default);
+        Assert.Equal(1, firstNative.Saves);
+        Assert.Equal(assignment.PresentationKey, item.PresentationUniqueKey);
+        var originalJournal = File.ReadAllText(JournalPath);
+
+        var readOnlyNative = new MemoryPersistence { OnSave = () => throw new InvalidOperationException("An unchanged plan must not write metadata.") };
+        GroupingPersistence.SavePlan(new GroupingPersistence(readOnlyNative, index, journal, () => true), library, plan, default);
+
+        Assert.Equal(0, readOnlyNative.Saves);
+        Assert.Equal(originalJournal, File.ReadAllText(JournalPath));
+        Assert.Equal("original", Assert.Single(journal.Read()).Original.PresentationKey);
     }
     [Fact] public void JournalSurvivesRestartAndRetainsFirstOriginal()
     {

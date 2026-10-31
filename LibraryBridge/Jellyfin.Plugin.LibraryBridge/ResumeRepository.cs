@@ -18,7 +18,9 @@ namespace Jellyfin.Plugin.LibraryBridge;
 public sealed class ResumeRepository(IItemRepository inner, BridgeIndex index, Func<bool>? enabled = null)
     : IItemRepository
 {
-    private static readonly MethodInfo CloneMethod = typeof(object).GetMethod("MemberwiseClone", BindingFlags.Instance | BindingFlags.NonPublic)!;
+    private static readonly PropertyInfo[] QueryOptions = typeof(InternalItemsQuery).GetProperties(BindingFlags.Instance | BindingFlags.Public)
+        .Where(property => property.GetMethod?.IsPublic == true && property.SetMethod?.IsPublic == true
+            && property.GetIndexParameters().Length == 0 && property.Name != nameof(InternalItemsQuery.DtoOptions)).ToArray();
 
     private bool Handles(InternalItemsQuery filter) => (enabled?.Invoke() ?? Plugin.Instance?.Configuration.Enabled == true)
         && filter.IsResumable == true && filter.User is not null && filter.GroupByPresentationUniqueKey
@@ -41,12 +43,20 @@ public sealed class ResumeRepository(IItemRepository inner, BridgeIndex index, F
     private IReadOnlyList<BaseItem> ResumeCandidates(InternalItemsQuery filter)
     {
         var snapshot = index.Current;
-        // Clone every query field, including user policy, library boundaries, sorting and DTO options.
+        // Copy the public query options, including user policy, library boundaries and sorting.
         // Expand paging/exclusions and load provider identities for signature validation.
-        // DTO options must also be cloned: the API still uses the original client's fields.
-        var candidates = (InternalItemsQuery)CloneMethod.Invoke(filter, null)!;
-        candidates.DtoOptions = (DtoOptions)CloneMethod.Invoke(filter.DtoOptions, null)!;
-        candidates.DtoOptions.Fields = filter.DtoOptions.Fields.Append(ItemFields.ProviderIds).Distinct().ToArray();
+        // Avoid invoking the runtime's private MemberwiseClone implementation through reflection.
+        // The API must retain its original DTO options and requested response fields.
+        var candidates = new InternalItemsQuery(filter.User);
+        foreach (var property in QueryOptions) property.SetValue(candidates, property.GetValue(filter));
+        var dto = filter.DtoOptions;
+        candidates.DtoOptions = new DtoOptions(false)
+        {
+            Fields = dto.Fields.Append(ItemFields.ProviderIds).Distinct().ToArray(),
+            ImageTypes = dto.ImageTypes.ToArray(), ImageTypeLimit = dto.ImageTypeLimit,
+            EnableImages = dto.EnableImages, EnableUserData = dto.EnableUserData,
+            AddCurrentProgram = dto.AddCurrentProgram, AddProgramRecordingInfo = dto.AddProgramRecordingInfo
+        };
         candidates.StartIndex = 0;
         candidates.Limit = null;
         candidates.EnableTotalRecordCount = false;
