@@ -1,6 +1,8 @@
+using Jellyfin.Data.Enums;
 using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Plugin.LibraryBridge.Core;
 using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Net;
 using MediaBrowser.Model.Dto;
@@ -26,6 +28,32 @@ public sealed class RequestUser(IHttpContextAccessor http, IAuthorizationContext
 public sealed class PlaybackSources(ILibraryManager library, BridgeIndex index, Func<bool>? enabled = null)
 {
     public bool Enabled => enabled?.Invoke() ?? Plugin.Instance?.Configuration.Enabled == true;
+    public Guid EpisodeQueueStart(Guid startId, Guid seriesId, User user)
+    {
+        var snapshot = index.Current;
+        if (!Enabled || !snapshot.Groups.TryGetValue(startId, out var group) || group.Kind != "Episode"
+            || !CanSelect(startId, startId, user)
+            || library.GetItemById<Episode>(startId, user) is not { } episode
+            || !snapshot.Groups.TryGetValue(episode.SeriesId, out var seriesGroup) || seriesGroup.Kind != "Series"
+            || !seriesGroup.ItemIds.Contains(seriesId)
+            || library.GetItemById<Series>(seriesId, user) is not { } series
+            || !snapshot.Assignments.TryGetValue(seriesId, out var seriesAssignment)
+            || !GroupingPersistence.Matches(series, seriesAssignment)) return startId;
+
+        // GetEpisodes skips everything until this exact ID. Its grouped listing may keep a
+        // different copy, so ask the native, user-filtered query which ID survives grouping.
+        // The client retains the original selected source when the returned row has another ID.
+        var ids = group.ItemIds.Where(id => CanSelect(startId, id, user)).ToArray();
+        if (ids.Length == 0) return startId;
+        var starts = library.GetItemIds(new InternalItemsQuery(user)
+        {
+            ItemIds = ids, IncludeItemTypes = [BaseItemKind.Episode],
+            SeriesPresentationUniqueKey = episode.SeriesPresentationUniqueKey,
+            GroupByPresentationUniqueKey = true,
+            IsMissing = user.DisplayMissingEpisodes ? null : false
+        });
+        return starts.Count == 1 && ids.Contains(starts[0]) ? starts[0] : startId;
+    }
     public bool CanSelect(Guid displayedId, Guid selectedId, User user)
     {
         var snapshot = index.Current;

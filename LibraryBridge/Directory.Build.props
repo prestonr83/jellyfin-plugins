@@ -4,7 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <Version>0.2.7.0</Version>
+    <Version>0.2.8.0</Version>
     <JellyfinVersion>12.4.0</JellyfinVersion>
   </PropertyGroup>
 </Project>

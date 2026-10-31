@@ -16,7 +16,7 @@
       "jellyfinVersion": "12.4.0",
       "nativeTests": true,
       "archivePrefix": "LibraryBridge",
-      "changelog": "Avoids rewriting unchanged item metadata when rebuilding already-applied grouping. Keeps recovery capture ahead of actual grouping changes, and replaces private runtime cloning of Continue Watching queries with copies through public query/DTO properties. Adds repeat-apply and concurrent-query regressions. Includes bounded metadata reads, PostgreSQL Unicode/cache tests, Continue Watching deduplication and the settings layout fixes."
+      "changelog": "Fixes empty episode playback queues when the chosen Local or On Demand copy is hidden by native grouping. Resolves the queue start through Jellyfin's user-filtered grouped query while preserving the selected playback source. Adds permission, identity, native-query and queue-routing regressions. Retains Continue Watching deduplication and previous stability fixes."
     },
     {
       "directory": "ParentalGuide",
@@ -33,7 +33,10 @@
       "solution": "Jellyfin.Database.Providers.Postgres.sln",
       "project": "Jellyfin.Database.Providers.Postgres/Jellyfin.Database.Providers.Postgres.csproj",
       "assembly": "Jellyfin.Database.Providers.Postgres.dll",
-      "runtimeAssemblies": ["Npgsql.dll", "Npgsql.EntityFrameworkCore.PostgreSQL.dll"],
+      "runtimeAssemblies": [
+        "Npgsql.dll",
+        "Npgsql.EntityFrameworkCore.PostgreSQL.dll"
+      ],
       "publish": true,
       "jellyfinVersion": "12.4.0",
       "nativeTests": false,

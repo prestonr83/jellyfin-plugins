@@ -4,7 +4,7 @@
   "description": "Cross-library search, Next Up and Continue Watching grouping with local/on-demand playback choices and shared progress.",
   "overview": "One title across local and on-demand libraries, with selectable sources and shared progress.",
   "category": "General",
-  "version": "0.2.7.0",
+  "version": "0.2.8.0",
   "targetAbi": "12.4.0.0",
   "status": "Active",
   "autoUpdate": true,

@@ -16,6 +16,13 @@ public sealed class BridgeApiFilter(PlaybackSources sources, RequestUser request
 {
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
+        if (sources.Enabled && context.HttpContext.Request.Path.Value?.EndsWith("/Episodes", StringComparison.OrdinalIgnoreCase) == true
+            && context.ActionArguments.TryGetValue("seriesId", out var queueSeries) && queueSeries is Guid seriesId
+            && context.ActionArguments.TryGetValue("startItemId", out var queueStart) && queueStart is Guid startId)
+        {
+            var user = await requestUser.ResolveAsync().ConfigureAwait(false);
+            if (user is not null) context.ActionArguments["startItemId"] = sources.EpisodeQueueStart(startId, seriesId, user);
+        }
         if (sources.Enabled)
         {
             foreach (var report in context.ActionArguments.Values)

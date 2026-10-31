@@ -9,6 +9,7 @@ using MediaBrowser.Controller;
 using MediaBrowser.Controller.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Persistence;
+using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Configuration;
 using MediaBrowser.Model.Querying;
 using Microsoft.Data.Sqlite;
@@ -196,6 +197,46 @@ public sealed class NativeQueryTests : IDisposable
         var bridge = new ResumeRepository(_repository, data.Index, () => true);
 
         Assert.Equal(3, bridge.GetItems(query).TotalRecordCount);
+    }
+    [Fact] public void EpisodeQueueStartMapsAnOmittedCopyToTheRealNativeGroupedRow()
+    {
+        Guid seriesId, startId, survivor;
+        using (var db = Context())
+        {
+            var series = Add(db, BaseItemKind.Series, _local, "Show", "series"); series.Path = "/local/show"; seriesId = series.Id;
+            var other = Add(db, BaseItemKind.Series, _demand, "Show", "series"); other.Path = "/demand/show";
+            foreach (var library in new[] { _local, _demand })
+            {
+                var episode = Add(db, BaseItemKind.Episode, library, "Episode", "episode");
+                episode.SeriesId = library == _local ? series.Id : other.Id;
+                episode.SeriesPresentationUniqueKey = "series"; episode.IndexNumber = 3; episode.ParentIndexNumber = 17;
+                episode.Path = library == _local ? "/local/show/episode.mkv" : "/demand/show/episode.strm";
+            }
+            db.SaveChanges();
+        }
+        var query = Query(BaseItemKind.Episode); query.SeriesPresentationUniqueKey = "series";
+        var listing = _repository.GetItemIdsList(query);
+        survivor = Assert.Single(listing);
+        query.GroupByPresentationUniqueKey = false;
+        startId = _repository.GetItemIdsList(query).Single(id => id != survivor);
+        Assert.Empty(listing.SkipWhile(id => id != startId)); // The native endpoint's broken queue before normalization.
+
+        var seriesQuery = Query(BaseItemKind.Series); seriesQuery.GroupByPresentationUniqueKey = false;
+        var items = _repository.GetItemList(query).Concat(_repository.GetItemList(seriesQuery)).ToArray();
+        var index = new BridgeIndex();
+        index.Publish(new(items.Select(item => new KeyAssignment(item.Id, item.Path, GroupingPersistence.Kind(item),
+            item.PresentationUniqueKey, item is MediaBrowser.Controller.Entities.TV.Episode ? "series" : null, "", 0)).ToArray(),
+            [new("series", "Series", "Show", items.Where(item => item is MediaBrowser.Controller.Entities.TV.Series).Select(item => item.Id).ToArray()),
+             new("episode", "Episode", "Episode", items.Where(item => item is MediaBrowser.Controller.Entities.TV.Episode).Select(item => item.Id).ToArray())], []));
+        var libraryManager = StubProxy.Create<ILibraryManager>((method, args) => method.Name switch
+        {
+            "GetItemById" => items.SingleOrDefault(item => item.Id == (Guid)args![0]!),
+            "GetItemIds" => _repository.GetItemIdsList((InternalItemsQuery)args![0]!).ToArray(),
+            _ => null
+        });
+        var normalized = new PlaybackSources(libraryManager, index, () => true).EpisodeQueueStart(startId, seriesId, _user);
+        Assert.Equal(survivor, normalized);
+        Assert.Equal(survivor, Assert.Single(listing.SkipWhile(id => id != normalized)));
     }
     public void Dispose() => _connection.Dispose();
 }

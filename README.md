@@ -4,7 +4,7 @@ Source, automated builds, and a Jellyfin installation/update catalog for Preston
 
 | Plugin | Current version | Minimum Jellyfin | Purpose |
 | --- | --- | --- | --- |
-| [Library Bridge](LibraryBridge/README.md) | 0.2.7.0 | 12.4.0 | One search, Next Up, and Continue Watching entry across local/on-demand libraries, with selectable sources and shared progress |
+| [Library Bridge](LibraryBridge/README.md) | 0.2.8.0 | 12.4.0 | One search, Next Up, and Continue Watching entry across local/on-demand libraries, with selectable sources and shared progress |
 | [Parental Guide](ParentalGuide/README.md) | 1.0.0.0 | 12.0.0 | Native scheduled parental-certification and Parents Guide metadata synchronization |
 | [PostgreSQL Database Provider](PostgresProvider/FORK.md) | 3.2.0.7 | 12.4.0 | Modified BORNIOS provider with the existing Jellyfin 12.4 compatibility and query-performance fixes |
 
@@ -16,7 +16,7 @@ After the first GitHub release is published, add this repository:
 https://github.com/prestonr83/jellyfin-plugins/releases/latest/download/manifest.json
 ```
 
-1. Open **Dashboard → Plugins → Repositories → Add** in Jellyfin.
+1. Open **Dashboard â†’ Plugins â†’ Repositories â†’ Add** in Jellyfin.
 2. Name it **Preston's Jellyfin Plugins** and paste the URL above.
 3. Open **Catalog**, select the desired plugin, and install.
 4. Restart Jellyfin when requested, then open the plugin's configuration page.
