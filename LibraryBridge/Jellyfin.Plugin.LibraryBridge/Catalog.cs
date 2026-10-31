@@ -26,9 +26,19 @@ public sealed class Catalog(ILibraryManager library)
             var alternate = Resolve(pair.AlternateLibrary);
             if (!usedLibraries.Add(primary) || !usedLibraries.Add(alternate))
                 throw new InvalidOperationException("Each library may appear in only one pair.");
-            Read(primary, pair.PrimaryLabel, 0);
-            Read(alternate, pair.AlternateLabel, 1);
-            plans.Add(PlanBuilder.Build(sides, $"{primary:N}:{alternate:N}:{pair.ContentType}"));
+            var primaryCount = Read(primary, pair.PrimaryLabel, 0);
+            var alternateCount = Read(alternate, pair.AlternateLabel, 1);
+            var plan = PlanBuilder.Build(sides, $"{primary:N}:{alternate:N}:{pair.ContentType}");
+            var warnings = plan.Warnings.ToList();
+            if (primaryCount == 0) Empty(pair.PrimaryLibrary);
+            if (alternateCount == 0) Empty(pair.AlternateLibrary);
+            if (plan.Groups.Length == 0)
+                warnings.Add($"No cross-library {pair.ContentType} matches for '{pair.PrimaryLibrary}' and '{pair.AlternateLibrary}' "
+                    + $"(Primary: {primaryCount}; Alternate: {alternateCount}). Matching titles must share valid TMDb, TVDb or IMDb provider IDs "
+                    + "and compatible metadata; existing version groups are excluded.");
+            plans.Add(plan with { Warnings = warnings.ToArray() });
+
+            void Empty(string name) => warnings.Add($"Library '{name}' returned no scanned {pair.ContentType} titles. Check the content type and library scan.");
 
             Guid Resolve(string name)
             {
@@ -38,22 +48,25 @@ public sealed class Catalog(ILibraryManager library)
                     throw new InvalidOperationException($"Library '{name}' must identify exactly one existing library by name or ID.");
                 return id;
             }
-            void Read(Guid id, string label, int preference)
+            int Read(Guid id, string label, int preference)
             {
                 var parent = library.GetItemById(id) ?? throw new InvalidOperationException("Library no longer exists.");
                 var kinds = pair.ContentType == "Movie" ? new[] { BaseItemKind.Movie }
                     : new[] { BaseItemKind.Series, BaseItemKind.Season, BaseItemKind.Episode };
-                var itemIds = library.GetItemIds(new InternalItemsQuery
+                // GetItemIds does not translate a recursive collection-folder parent into
+                // its physical roots. GetItemList performs that native library expansion.
+                var items = library.GetItemList(new InternalItemsQuery
                 {
                     Parent = parent, Recursive = true, IncludeItemTypes = kinds,
                     GroupByPresentationUniqueKey = false, IncludeAlternateVersions = true,
                     SourceTypes = [SourceType.Library], IsVirtualItem = false
                 });
-                foreach (var itemId in itemIds)
+                var titleCount = 0;
+                foreach (var item in items)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var item = library.GetItemById(itemId);
-                    if (item is null || string.IsNullOrEmpty(item.Path)) continue;
+                    if (string.IsNullOrEmpty(item.Path)) continue;
+                    if (GroupingPersistence.Kind(item) == pair.ContentType) titleCount++;
                     var eligible = item is not Video video || (!video.PrimaryVersionId.HasValue
                         && video.LinkedAlternateVersions.Length == 0 && video.LocalAlternateVersions.Length == 0
                         && video.OwnerId == Guid.Empty);
@@ -66,6 +79,7 @@ public sealed class Catalog(ILibraryManager library)
                         (item as Episode)?.IndexNumberEnd,
                         (item as Series)?.DisplayOrder?.Trim() ?? "", eligible));
                 }
+                return titleCount;
             }
         }
         return new(plans.SelectMany(p => p.Assignments).ToArray(), plans.SelectMany(p => p.Groups).ToArray(), plans.SelectMany(p => p.Warnings).ToArray());
